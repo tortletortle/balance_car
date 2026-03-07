@@ -52,3 +52,10 @@
 - 明确 `USART1` 第一阶段以 `115200 8N1` 标准异步串口为基线
 - 明确首阶段先做最小发送和基础接收，不直接上 DMA
 - 在 `docs/DECISIONS.md` 中补充 `USART1` 分阶段开启决策
+
+### [实现] 完成 USART1 最小发送验证
+
+- 在 `Two_balance_car/Core/Src/main.c` 的 `USER CODE` 区域加入最小串口发送逻辑
+- 上电后发送 `BOOT,USART1=OK`
+- 主循环每 1 秒发送一次 `HB,USART1=OK`
+- 本次只做最小发送验证，不引入 DMA、协议解析或驱动层封装
