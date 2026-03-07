@@ -181,5 +181,30 @@
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_soft_i2c.h</locationURI>
 		</link>
+			<link>
+			<name>Application/User/Drivers/drv_adc.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_adc.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_adc.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_adc.h</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Devices/dev_mpu6050.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/devices/dev_mpu6050.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Devices/dev_mpu6050.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/devices/dev_mpu6050.h</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Devices/dev_mpu6050_reg.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/devices/dev_mpu6050_reg.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

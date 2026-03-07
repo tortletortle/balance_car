@@ -87,3 +87,9 @@
 - 更新 `Two_balance_car/STM32CubeIDE/.project` 与 `Two_balance_car/STM32CubeIDE/.cproject`，把 `drivers` 目录中的首批驱动纳入当前 `STM32CubeIDE` 工程构建与索引路径
 - 在 `Two_balance_car/Core/Src/main.c` 中加入最小驱动接入：上电后启动 `TIM2/TIM4` 编码器接口，并初始化 IMU 使用的软件 I2C 总线
 - 当前接入只完成“驱动进入工程并可初始化”，还没有开始 `MPU6050` 器件层封装，也没有开始电池电压读取与换算逻辑
+### [实现] 补齐 `drv_adc` 与 `dev_mpu6050`
+
+- 新增 `drivers/drv_adc.h` 与 `drivers/drv_adc.c`，把样例中的单次采样、平均采样思路重写为基于 HAL 的 ADC 驱动接口
+- 新增 `devices/dev_mpu6050.h`、`devices/dev_mpu6050.c` 与 `devices/dev_mpu6050_reg.h`，把 `MPU6050` 的寄存器定义、初始化流程和原始数据读取放到 `devices` 层
+- 更新 `Two_balance_car/Core/Src/main.c`，把 ADC 驱动与 MPU6050 设备做最小初始化接入
+- 更新 `STM32CubeIDE` 工程元数据，使 `drivers` 与 `devices` 层新文件进入当前工程构建链

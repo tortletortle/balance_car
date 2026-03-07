@@ -28,8 +28,10 @@
 /* USER CODE BEGIN Includes */
 
 #include <stdint.h>
+#include "drv_adc.h"
 #include "drv_encoder.h"
 #include "drv_soft_i2c.h"
+#include "dev_mpu6050.h"
 
 /* USER CODE END Includes */
 
@@ -53,9 +55,11 @@
 /* USER CODE BEGIN PV */
 
 static uint32_t g_uart_heartbeat_last_ms = 0U;
+static drv_adc_t g_battery_adc;
 static drv_encoder_t g_encoder_tim2;
 static drv_encoder_t g_encoder_tim4;
 static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
+static dev_mpu6050_t g_mpu6050;
 
 /* USER CODE END PV */
 
@@ -130,6 +134,21 @@ static void App_DriversInit(void)
   }
 
   if (drv_soft_i2c_init(&g_imu_soft_i2c_bus) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (drv_adc_init(&g_battery_adc, &hadc1, ADC_CHANNEL_6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (dev_mpu6050_bind(&g_mpu6050, &g_imu_soft_i2c_bus, DEV_MPU6050_DEFAULT_ADDRESS_7BIT) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (dev_mpu6050_init(&g_mpu6050, &g_dev_mpu6050_default_init_config) != HAL_OK)
   {
     Error_Handler();
   }
