@@ -16,6 +16,33 @@ static int16_t dev_mpu6050_make_int16(uint8_t msb, uint8_t lsb)
     return (int16_t)((((uint16_t)msb) << 8) | lsb);
 }
 
+static HAL_StatusTypeDef dev_mpu6050_read_word(dev_mpu6050_t *device, uint8_t reg_addr_high, int16_t *word_value)
+{
+    HAL_StatusTypeDef status;
+    uint8_t high_byte;
+    uint8_t low_byte;
+
+    if ((device == NULL) || (word_value == NULL))
+    {
+        return HAL_ERROR;
+    }
+
+    status = dev_mpu6050_read_reg(device, reg_addr_high, &high_byte);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
+
+    status = dev_mpu6050_read_reg(device, (uint8_t)(reg_addr_high + 1U), &low_byte);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
+
+    *word_value = dev_mpu6050_make_int16(high_byte, low_byte);
+    return HAL_OK;
+}
+
 HAL_StatusTypeDef dev_mpu6050_bind(dev_mpu6050_t *device, drv_soft_i2c_bus_t *bus, uint8_t address_7bit)
 {
     if ((device == NULL) || (bus == NULL))
@@ -90,26 +117,43 @@ HAL_StatusTypeDef dev_mpu6050_init(dev_mpu6050_t *device, const dev_mpu6050_init
 HAL_StatusTypeDef dev_mpu6050_read_raw(dev_mpu6050_t *device, dev_mpu6050_raw_data_t *raw_data)
 {
     HAL_StatusTypeDef status;
-    uint8_t buffer[14];
 
     if ((device == NULL) || (device->bus == NULL) || (raw_data == NULL))
     {
         return HAL_ERROR;
     }
 
-    status = drv_soft_i2c_read_mem(device->bus, device->address_7bit, DEV_MPU6050_REG_ACCEL_XOUT_H, buffer, 14U);
+    status = dev_mpu6050_read_word(device, DEV_MPU6050_REG_ACCEL_XOUT_H, &raw_data->accel_x);
     if (status != HAL_OK)
     {
         return status;
     }
 
-    raw_data->accel_x = dev_mpu6050_make_int16(buffer[0], buffer[1]);
-    raw_data->accel_y = dev_mpu6050_make_int16(buffer[2], buffer[3]);
-    raw_data->accel_z = dev_mpu6050_make_int16(buffer[4], buffer[5]);
-    raw_data->temperature = dev_mpu6050_make_int16(buffer[6], buffer[7]);
-    raw_data->gyro_x = dev_mpu6050_make_int16(buffer[8], buffer[9]);
-    raw_data->gyro_y = dev_mpu6050_make_int16(buffer[10], buffer[11]);
-    raw_data->gyro_z = dev_mpu6050_make_int16(buffer[12], buffer[13]);
+    status = dev_mpu6050_read_word(device, (uint8_t)(DEV_MPU6050_REG_ACCEL_XOUT_H + 2U), &raw_data->accel_y);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
 
-    return HAL_OK;
+    status = dev_mpu6050_read_word(device, (uint8_t)(DEV_MPU6050_REG_ACCEL_XOUT_H + 4U), &raw_data->accel_z);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
+
+    raw_data->temperature = 0;
+
+    status = dev_mpu6050_read_word(device, DEV_MPU6050_REG_GYRO_XOUT_H, &raw_data->gyro_x);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
+
+    status = dev_mpu6050_read_word(device, (uint8_t)(DEV_MPU6050_REG_GYRO_XOUT_H + 2U), &raw_data->gyro_y);
+    if (status != HAL_OK)
+    {
+        return status;
+    }
+
+    return dev_mpu6050_read_word(device, (uint8_t)(DEV_MPU6050_REG_GYRO_XOUT_H + 4U), &raw_data->gyro_z);
 }

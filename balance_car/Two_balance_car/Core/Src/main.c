@@ -137,7 +137,7 @@ static void App_DriversInit(void)
   g_imu_soft_i2c_bus.scl_pin = IMU_SCL_Pin;
   g_imu_soft_i2c_bus.sda_port = IMU_SDA_GPIO_Port;
   g_imu_soft_i2c_bus.sda_pin = IMU_SDA_Pin;
-  g_imu_soft_i2c_bus.bit_delay_us = 5U;
+  g_imu_soft_i2c_bus.bit_delay_us = 10U;
   g_imu_soft_i2c_bus.delay_us = App_DelayUs;
 
 #if APP_IMU_BRINGUP_ONLY == 0U
