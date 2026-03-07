@@ -38,3 +38,10 @@
 - 新增 `docs/FILE_LAYOUT_PLAN.md`，把各目录细化到推荐的 `.c/.h` 文件级别
 - 为每个目录和文件给出职责说明，作为后续正式开发的落地蓝图
 - 在 `docs/DECISIONS.md` 中补充分层架构与控制层边界决策
+
+### [规则] 增加 STM32CubeIDE 工具链约束
+
+- 在 `docs/WORKFLOW.md` 中补充正式开发工具链规则，明确后续统一采用 `STM32CubeIDE` 和 `.ioc`
+- 明确外设初始化、时钟、GPIO 复用和基础资源配置以 `CubeMX` 生成为基线
+- 明确修改生成文件时优先使用 `USER CODE` 区域，避免破坏再生能力
+- 在 `docs/DECISIONS.md` 中补充 `STM32CubeIDE` 工具链和 `CubeMX` 外设规则相关决策
