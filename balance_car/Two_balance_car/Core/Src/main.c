@@ -49,6 +49,7 @@
 #define APP_MPU6050_ZERO_SAMPLE_COUNT        300U
 #define APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS  5U
 #define APP_MPU6050_REPORT_INTERVAL_MS       200U
+#define APP_MPU6050_CAL_PROGRESS_STEP       50U
 
 /* USER CODE END PD */
 
@@ -63,6 +64,7 @@
 
 static uint32_t g_uart_heartbeat_last_ms = 0U;
 static uint32_t g_mpu_report_last_ms = 0U;
+static uint8_t g_mpu_calibration_ok = 0U;
 static int32_t g_mpu_gyro_bias_x = 0;
 static int32_t g_mpu_gyro_bias_y = 0;
 static int32_t g_mpu_gyro_bias_z = 0;
@@ -241,23 +243,34 @@ static void App_Mpu6050CalibrateZero(void)
   int64_t sum_gyro_y = 0;
   int64_t sum_gyro_z = 0;
 
+  g_mpu_calibration_ok = 0U;
+
   if (dev_mpu6050_read_who_am_i(&g_mpu6050, &who_am_i) != HAL_OK)
   {
     App_UartSendText("MPU,WHOAMI=READ_ERR\r\n");
-    Error_Handler();
+    return;
   }
 
   App_UartSendFormat("MPU,WHOAMI=0x%02X\r\n", who_am_i);
   App_UartSendFormat("MPU,CALIBRATING=%lu\r\n", (unsigned long)APP_MPU6050_ZERO_SAMPLE_COUNT);
 
   HAL_Delay(500U);
+  App_UartSendText("MPU,CAL,START\r\n");
+
+  if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
+  {
+    App_UartSendText("MPU,CAL,RAW_TEST=ERR\r\n");
+    return;
+  }
+
+  App_UartSendText("MPU,CAL,RAW_TEST=OK\r\n");
 
   for (sample_index = 0U; sample_index < APP_MPU6050_ZERO_SAMPLE_COUNT; sample_index++)
   {
     if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
     {
-      App_UartSendText("MPU,READ=ERR\r\n");
-      Error_Handler();
+      App_UartSendFormat("MPU,CAL,READ_ERR,IDX=%lu\r\n", (unsigned long)sample_index);
+      return;
     }
 
     sum_accel_x += raw_data.accel_x;
@@ -267,8 +280,15 @@ static void App_Mpu6050CalibrateZero(void)
     sum_gyro_y += raw_data.gyro_y;
     sum_gyro_z += raw_data.gyro_z;
 
+    if (((sample_index + 1U) % APP_MPU6050_CAL_PROGRESS_STEP) == 0U)
+    {
+      App_UartSendFormat("MPU,CAL,IDX=%lu\r\n", (unsigned long)(sample_index + 1U));
+    }
+
     HAL_Delay(APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS);
   }
+
+  App_UartSendText("MPU,CAL,SUM_OK\r\n");
 
   g_mpu_accel_zero_x = (int32_t)(sum_accel_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
   g_mpu_accel_zero_y = (int32_t)(sum_accel_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
@@ -276,7 +296,11 @@ static void App_Mpu6050CalibrateZero(void)
   g_mpu_gyro_bias_x = (int32_t)(sum_gyro_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
   g_mpu_gyro_bias_y = (int32_t)(sum_gyro_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
   g_mpu_gyro_bias_z = (int32_t)(sum_gyro_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+
+  App_UartSendText("MPU,CAL,AVG_OK\r\n");
+
   g_mpu_pitch_zero_mdeg = App_Mpu6050EstimatePitchMdeg(g_mpu_accel_zero_x, g_mpu_accel_zero_z);
+  App_UartSendText("MPU,CAL,PITCH_OK\r\n");
 
   App_UartSendFormat("MPU_ZERO,GX=%ld,GY=%ld,GZ=%ld\r\n",
                     (long)g_mpu_gyro_bias_x,
@@ -287,6 +311,8 @@ static void App_Mpu6050CalibrateZero(void)
                     (long)g_mpu_accel_zero_y,
                     (long)g_mpu_accel_zero_z);
   App_UartSendFormat("MPU_PITCH_ZERO_MDEG=%ld\r\n", (long)g_mpu_pitch_zero_mdeg);
+  App_UartSendText("MPU,CAL=OK\r\n");
+  g_mpu_calibration_ok = 1U;
 }
 
 static void App_Mpu6050ReportRaw(void)
@@ -302,7 +328,8 @@ static void App_Mpu6050ReportRaw(void)
 
   pitch_zero_relative_mdeg = App_Mpu6050EstimatePitchMdeg(raw_data.accel_x, raw_data.accel_z) - g_mpu_pitch_zero_mdeg;
 
-  App_UartSendFormat("MPU_RAW,AX=%d,AY=%d,AZ=%d,GX=%d,GY=%d,GZ=%d,GX0=%ld,GY0=%ld,GZ0=%ld,PITCH0=%ld\r\n",
+  App_UartSendFormat("MPU_RAW,CAL=%u,AX=%d,AY=%d,AZ=%d,GX=%d,GY=%d,GZ=%d,GX0=%ld,GY0=%ld,GZ0=%ld,PITCH0=%ld\r\n",
+                    g_mpu_calibration_ok,
                     raw_data.accel_x,
                     raw_data.accel_y,
                     raw_data.accel_z,
