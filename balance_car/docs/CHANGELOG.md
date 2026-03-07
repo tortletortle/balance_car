@@ -93,3 +93,10 @@
 - 新增 `devices/dev_mpu6050.h`、`devices/dev_mpu6050.c` 与 `devices/dev_mpu6050_reg.h`，把 `MPU6050` 的寄存器定义、初始化流程和原始数据读取放到 `devices` 层
 - 更新 `Two_balance_car/Core/Src/main.c`，把 ADC 驱动与 MPU6050 设备做最小初始化接入
 - 更新 `STM32CubeIDE` 工程元数据，使 `drivers` 与 `devices` 层新文件进入当前工程构建链
+
+### [实现] 启动 `MPU6050` 零偏与零点调试
+
+- 更新 `Two_balance_car/Core/Src/main.c`，在完成 `MPU6050` 初始化后增加启动自检与静止校零流程
+- 启动后通过串口输出 `WHO_AM_I`、静止平均陀螺零偏 `GX/GY/GZ`、静止平均加速度 `AX/AY/AZ` 和当前安装姿态零点 `PITCH_ZERO_MDEG`
+- 主循环增加周期原始数据观测，持续输出当前 `AX/AY/AZ`、`GX/GY/GZ`、去零偏后的陀螺值和相对零点俯仰角 `PITCH0`
+- 本次仍属于 bringup/debug 阶段，不进入正式姿态估计、互补滤波或控制环实现

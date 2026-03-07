@@ -27,6 +27,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <math.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdint.h>
 #include "drv_adc.h"
 #include "drv_encoder.h"
@@ -43,6 +46,10 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define APP_MPU6050_ZERO_SAMPLE_COUNT        300U
+#define APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS  5U
+#define APP_MPU6050_REPORT_INTERVAL_MS       200U
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -55,6 +62,14 @@
 /* USER CODE BEGIN PV */
 
 static uint32_t g_uart_heartbeat_last_ms = 0U;
+static uint32_t g_mpu_report_last_ms = 0U;
+static int32_t g_mpu_gyro_bias_x = 0;
+static int32_t g_mpu_gyro_bias_y = 0;
+static int32_t g_mpu_gyro_bias_z = 0;
+static int32_t g_mpu_accel_zero_x = 0;
+static int32_t g_mpu_accel_zero_y = 0;
+static int32_t g_mpu_accel_zero_z = 0;
+static int32_t g_mpu_pitch_zero_mdeg = 0;
 static drv_adc_t g_battery_adc;
 static drv_encoder_t g_encoder_tim2;
 static drv_encoder_t g_encoder_tim4;
@@ -68,6 +83,10 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 
 static void App_UartSendText(const char *text);
+static void App_UartSendFormat(const char *format, ...);
+static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z);
+static void App_Mpu6050CalibrateZero(void);
+static void App_Mpu6050ReportRaw(void);
 static void App_DelayUsInit(void);
 static void App_DelayUs(uint32_t delay_us);
 static void App_DriversInit(void);
@@ -174,6 +193,128 @@ static void App_UartSendText(const char *text)
   }
 }
 
+static void App_UartSendFormat(const char *format, ...)
+{
+  char buffer[160];
+  int len;
+  va_list args;
+
+  if (format == NULL)
+  {
+    return;
+  }
+
+  va_start(args, format);
+  len = vsnprintf(buffer, sizeof(buffer), format, args);
+  va_end(args);
+
+  if (len <= 0)
+  {
+    return;
+  }
+
+  if (len >= (int)sizeof(buffer))
+  {
+    len = (int)sizeof(buffer) - 1;
+  }
+
+  (void)HAL_UART_Transmit(&huart1, (uint8_t *)buffer, (uint16_t)len, 100U);
+}
+
+static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z)
+{
+  float pitch_deg;
+
+  pitch_deg = -atan2f((float)accel_x, (float)accel_z) * 57.2957795f;
+  return (int32_t)(pitch_deg * 1000.0f);
+}
+
+static void App_Mpu6050CalibrateZero(void)
+{
+  uint32_t sample_index;
+  uint8_t who_am_i = 0U;
+  dev_mpu6050_raw_data_t raw_data = {0};
+  int64_t sum_accel_x = 0;
+  int64_t sum_accel_y = 0;
+  int64_t sum_accel_z = 0;
+  int64_t sum_gyro_x = 0;
+  int64_t sum_gyro_y = 0;
+  int64_t sum_gyro_z = 0;
+
+  if (dev_mpu6050_read_who_am_i(&g_mpu6050, &who_am_i) != HAL_OK)
+  {
+    App_UartSendText("MPU,WHOAMI=READ_ERR\r\n");
+    Error_Handler();
+  }
+
+  App_UartSendFormat("MPU,WHOAMI=0x%02X\r\n", who_am_i);
+  App_UartSendFormat("MPU,CALIBRATING=%lu\r\n", (unsigned long)APP_MPU6050_ZERO_SAMPLE_COUNT);
+
+  HAL_Delay(500U);
+
+  for (sample_index = 0U; sample_index < APP_MPU6050_ZERO_SAMPLE_COUNT; sample_index++)
+  {
+    if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
+    {
+      App_UartSendText("MPU,READ=ERR\r\n");
+      Error_Handler();
+    }
+
+    sum_accel_x += raw_data.accel_x;
+    sum_accel_y += raw_data.accel_y;
+    sum_accel_z += raw_data.accel_z;
+    sum_gyro_x += raw_data.gyro_x;
+    sum_gyro_y += raw_data.gyro_y;
+    sum_gyro_z += raw_data.gyro_z;
+
+    HAL_Delay(APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS);
+  }
+
+  g_mpu_accel_zero_x = (int32_t)(sum_accel_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_accel_zero_y = (int32_t)(sum_accel_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_accel_zero_z = (int32_t)(sum_accel_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_gyro_bias_x = (int32_t)(sum_gyro_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_gyro_bias_y = (int32_t)(sum_gyro_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_gyro_bias_z = (int32_t)(sum_gyro_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_pitch_zero_mdeg = App_Mpu6050EstimatePitchMdeg(g_mpu_accel_zero_x, g_mpu_accel_zero_z);
+
+  App_UartSendFormat("MPU_ZERO,GX=%ld,GY=%ld,GZ=%ld\r\n",
+                    (long)g_mpu_gyro_bias_x,
+                    (long)g_mpu_gyro_bias_y,
+                    (long)g_mpu_gyro_bias_z);
+  App_UartSendFormat("MPU_ACC_ZERO,AX=%ld,AY=%ld,AZ=%ld\r\n",
+                    (long)g_mpu_accel_zero_x,
+                    (long)g_mpu_accel_zero_y,
+                    (long)g_mpu_accel_zero_z);
+  App_UartSendFormat("MPU_PITCH_ZERO_MDEG=%ld\r\n", (long)g_mpu_pitch_zero_mdeg);
+}
+
+static void App_Mpu6050ReportRaw(void)
+{
+  dev_mpu6050_raw_data_t raw_data = {0};
+  int32_t pitch_zero_relative_mdeg;
+
+  if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
+  {
+    App_UartSendText("MPU,READ=ERR\r\n");
+    return;
+  }
+
+  pitch_zero_relative_mdeg = App_Mpu6050EstimatePitchMdeg(raw_data.accel_x, raw_data.accel_z) - g_mpu_pitch_zero_mdeg;
+
+  App_UartSendFormat("MPU_RAW,AX=%d,AY=%d,AZ=%d,GX=%d,GY=%d,GZ=%d,GX0=%ld,GY0=%ld,GZ0=%ld,PITCH0=%ld\r\n",
+                    raw_data.accel_x,
+                    raw_data.accel_y,
+                    raw_data.accel_z,
+                    raw_data.gyro_x,
+                    raw_data.gyro_y,
+                    raw_data.gyro_z,
+                    (long)((int32_t)raw_data.gyro_x - g_mpu_gyro_bias_x),
+                    (long)((int32_t)raw_data.gyro_y - g_mpu_gyro_bias_y),
+                    (long)((int32_t)raw_data.gyro_z - g_mpu_gyro_bias_z),
+                    (long)pitch_zero_relative_mdeg);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -217,7 +358,9 @@ int main(void)
 
   App_DriversInit();
   App_UartSendText("BOOT,USART1=OK\r\n");
+  App_Mpu6050CalibrateZero();
   g_uart_heartbeat_last_ms = HAL_GetTick();
+  g_mpu_report_last_ms = HAL_GetTick();
 
   /* USER CODE END 2 */
 
@@ -232,6 +375,12 @@ int main(void)
     {
       g_uart_heartbeat_last_ms = HAL_GetTick();
       App_UartSendText("HB,USART1=OK\r\n");
+    }
+
+    if ((HAL_GetTick() - g_mpu_report_last_ms) >= APP_MPU6050_REPORT_INTERVAL_MS)
+    {
+      g_mpu_report_last_ms = HAL_GetTick();
+      App_Mpu6050ReportRaw();
     }
   }
   /* USER CODE END 3 */
