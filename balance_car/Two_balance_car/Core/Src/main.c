@@ -50,6 +50,7 @@
 #define APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS  5U
 #define APP_MPU6050_REPORT_INTERVAL_MS       200U
 #define APP_MPU6050_CAL_PROGRESS_STEP       50U
+#define APP_IMU_BRINGUP_ONLY                1U
 
 /* USER CODE END PD */
 
@@ -72,9 +73,11 @@ static int32_t g_mpu_accel_zero_x = 0;
 static int32_t g_mpu_accel_zero_y = 0;
 static int32_t g_mpu_accel_zero_z = 0;
 static int32_t g_mpu_pitch_zero_mdeg = 0;
+#if APP_IMU_BRINGUP_ONLY == 0U
 static drv_adc_t g_battery_adc;
 static drv_encoder_t g_encoder_tim2;
 static drv_encoder_t g_encoder_tim4;
+#endif
 static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
 static dev_mpu6050_t g_mpu6050;
 
@@ -87,6 +90,8 @@ void SystemClock_Config(void);
 static void App_UartSendText(const char *text);
 static void App_UartSendFormat(const char *format, ...);
 static void App_ReportResetFlags(void);
+static void App_DisableUnusedIrq(void);
+static void App_Mpu6050SendCalIndex(uint32_t sample_index);
 static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z);
 static void App_Mpu6050CalibrateZero(void);
 static void App_Mpu6050ReportRaw(void);
@@ -135,6 +140,7 @@ static void App_DriversInit(void)
   g_imu_soft_i2c_bus.bit_delay_us = 5U;
   g_imu_soft_i2c_bus.delay_us = App_DelayUs;
 
+#if APP_IMU_BRINGUP_ONLY == 0U
   if (drv_encoder_init(&g_encoder_tim2, &htim2, 1) != HAL_OK)
   {
     Error_Handler();
@@ -155,12 +161,13 @@ static void App_DriversInit(void)
     Error_Handler();
   }
 
-  if (drv_soft_i2c_init(&g_imu_soft_i2c_bus) != HAL_OK)
+  if (drv_adc_init(&g_battery_adc, &hadc1, ADC_CHANNEL_6) != HAL_OK)
   {
     Error_Handler();
   }
+#endif
 
-  if (drv_adc_init(&g_battery_adc, &hadc1, ADC_CHANNEL_6) != HAL_OK)
+  if (drv_soft_i2c_init(&g_imu_soft_i2c_bus) != HAL_OK)
   {
     Error_Handler();
   }
@@ -253,6 +260,32 @@ static void App_ReportResetFlags(void)
 
   __HAL_RCC_CLEAR_RESET_FLAGS();
 }
+static void App_DisableUnusedIrq(void)
+{
+#if APP_IMU_BRINGUP_ONLY != 0U
+  HAL_NVIC_DisableIRQ(USART1_IRQn);
+  HAL_NVIC_DisableIRQ(DMA1_Channel4_IRQn);
+  HAL_NVIC_DisableIRQ(DMA1_Channel5_IRQn);
+  HAL_NVIC_DisableIRQ(TIM1_UP_IRQn);
+#endif
+}
+
+static void App_Mpu6050SendCalIndex(uint32_t sample_index)
+{
+  char text[] = "MPU,CAL,IDX=000\r\n";
+  uint32_t value;
+
+  value = sample_index + 1U;
+  if (value > 999U)
+  {
+    value = 999U;
+  }
+
+  text[12] = (char)('0' + ((value / 100U) % 10U));
+  text[13] = (char)('0' + ((value / 10U) % 10U));
+  text[14] = (char)('0' + (value % 10U));
+  App_UartSendText(text);
+}
 
 static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z)
 {
@@ -313,7 +346,7 @@ static void App_Mpu6050CalibrateZero(void)
 
     if (((sample_index + 1U) <= 10U) || (((sample_index + 1U) % APP_MPU6050_CAL_PROGRESS_STEP) == 0U))
     {
-      App_UartSendFormat("MPU,CAL,IDX=%lu\r\n", (unsigned long)(sample_index + 1U));
+      App_Mpu6050SendCalIndex(sample_index);
     }
 
     HAL_Delay(APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS);
@@ -405,13 +438,16 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
+#if APP_IMU_BRINGUP_ONLY == 0U
   MX_ADC1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
-  MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+#endif
+  MX_USART1_UART_Init();
+  App_DisableUnusedIrq();
   /* USER CODE BEGIN 2 */
 
   App_DriversInit();

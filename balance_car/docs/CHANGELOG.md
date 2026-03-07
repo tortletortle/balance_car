@@ -110,3 +110,8 @@
 - 更新 `Two_balance_car/Core/Src/main.c`，在串口启动后立刻输出 `RST` 行，打印 `RCC->CSR` 原始值以及 `PIN/POR/SFT/IWDG/WWDG/LPWR` 复位标志
 - 校零采样阶段增加前 10 次采样进度打印，用于判断系统是在第几次连续读取后出现异常复位
 - 本次目标是先分清“软件逻辑卡死”和“MCU 真正复位”两类问题，再决定是继续查总线、供电还是外部复位源
+### [调试] 收敛 `MPU6050` 调试路径为 IMU-only
+
+- 更新 `Two_balance_car/Core/Src/main.c`，当前 `MPU6050` bringup 阶段只保留 `GPIO + DMA时钟 + USART1 + soft_i2c + MPU6050` 相关初始化，暂时不再带上编码器、ADC、TIM1/TIM2/TIM3/TIM4、USART2 等无关外设一起运行
+- 关闭当前 IMU bringup 阶段不需要的 `USART1 IRQ`、`DMA IRQ` 和 `TIM1_UP IRQ`，减少中断侧干扰变量
+- 将校零进度打印从 `vsnprintf` 改为轻量固定格式字符串，继续保留进度可见性，同时降低循环内调试输出复杂度
