@@ -67,3 +67,10 @@
 - `main.c` 初始化序列已扩展为：`GPIO -> ADC1 -> TIM1 -> TIM2 -> TIM3 -> TIM4 -> USART1 -> USART2`
 - 本次仅完成“外设开通和工程可编译”，未开始驱动封装、外设启动策略和上层业务逻辑
 - 已验证 `STM32CubeIDE` 头less 编译通过
+
+### [修复] 收敛 Main Config 外设警告
+
+- 更新 `Two_balance_car/Two_balance_car.ioc`，清理会触发 `Main Config` 警告的 RCC / USART 参数残留，并修正错误拼接的引脚条目
+- 当前 `.ioc` 已通过 `STM32CubeMX` 的 `config load` 快速校验，`NVIC`、`Clock`、`TIM1`、`USART1`、`USART2` 不再报参数错误
+- 使用当前工程重新完成代码生成与编译验证，确认本轮收敛没有引入新的工程级错误
+- 本次提交只收敛工程配置一致性，不新增控制逻辑、不推进驱动封装
