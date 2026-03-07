@@ -74,3 +74,10 @@
 - 当前 `.ioc` 已通过 `STM32CubeMX` 的 `config load` 快速校验，`NVIC`、`Clock`、`TIM1`、`USART1`、`USART2` 不再报参数错误
 - 使用当前工程重新完成代码生成与编译验证，确认本轮收敛没有引入新的工程级错误
 - 本次提交只收敛工程配置一致性，不新增控制逻辑、不推进驱动封装
+
+### [实现] 落地首批 drivers 层基础驱动
+
+- 新增 `drivers/drv_encoder.h` 与 `drivers/drv_encoder.c`，把样例中的霍尔编码器读数逻辑重写为基于 HAL 的通用编码器驱动接口
+- 新增 `drivers/drv_soft_i2c.h` 与 `drivers/drv_soft_i2c.c`，把样例中的软件 I2C 起始、停止、字节收发与寄存器读写基元提炼为独立驱动层能力
+- 本次只实现 `drivers` 层，不把 `MPU6050` 的器件语义混入驱动层；后续 `MPU6050` 将单独进入 `devices`
+- 当前驱动代码先按仓库分层落位到 `drivers/`，与 `CubeMX` 生成的板级初始化保持解耦，便于后续逐步接入新工程主线
