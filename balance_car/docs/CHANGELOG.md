@@ -81,3 +81,9 @@
 - 新增 `drivers/drv_soft_i2c.h` 与 `drivers/drv_soft_i2c.c`，把样例中的软件 I2C 起始、停止、字节收发与寄存器读写基元提炼为独立驱动层能力
 - 本次只实现 `drivers` 层，不把 `MPU6050` 的器件语义混入驱动层；后续 `MPU6050` 将单独进入 `devices`
 - 当前驱动代码先按仓库分层落位到 `drivers/`，与 `CubeMX` 生成的板级初始化保持解耦，便于后续逐步接入新工程主线
+
+### [实现] 把首批 drivers 接入 CubeIDE 工程
+
+- 更新 `Two_balance_car/STM32CubeIDE/.project` 与 `Two_balance_car/STM32CubeIDE/.cproject`，把 `drivers` 目录中的首批驱动纳入当前 `STM32CubeIDE` 工程构建与索引路径
+- 在 `Two_balance_car/Core/Src/main.c` 中加入最小驱动接入：上电后启动 `TIM2/TIM4` 编码器接口，并初始化 IMU 使用的软件 I2C 总线
+- 当前接入只完成“驱动进入工程并可初始化”，还没有开始 `MPU6050` 器件层封装，也没有开始电池电压读取与换算逻辑

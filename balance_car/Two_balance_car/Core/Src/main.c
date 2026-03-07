@@ -1,4 +1,4 @@
-﻿/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "dma.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -27,6 +28,8 @@
 /* USER CODE BEGIN Includes */
 
 #include <stdint.h>
+#include "drv_encoder.h"
+#include "drv_soft_i2c.h"
 
 /* USER CODE END Includes */
 
@@ -50,6 +53,9 @@
 /* USER CODE BEGIN PV */
 
 static uint32_t g_uart_heartbeat_last_ms = 0U;
+static drv_encoder_t g_encoder_tim2;
+static drv_encoder_t g_encoder_tim4;
+static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
 
 /* USER CODE END PV */
 
@@ -58,11 +64,76 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 
 static void App_UartSendText(const char *text);
+static void App_DelayUsInit(void);
+static void App_DelayUs(uint32_t delay_us);
+static void App_DriversInit(void);
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static void App_DelayUsInit(void)
+{
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  DWT->CYCCNT = 0U;
+}
+
+static void App_DelayUs(uint32_t delay_us)
+{
+  uint32_t start_cycle;
+  uint32_t wait_cycles;
+
+  if (delay_us == 0U)
+  {
+    return;
+  }
+
+  start_cycle = DWT->CYCCNT;
+  wait_cycles = (SystemCoreClock / 1000000U) * delay_us;
+
+  while ((DWT->CYCCNT - start_cycle) < wait_cycles)
+  {
+  }
+}
+
+static void App_DriversInit(void)
+{
+  App_DelayUsInit();
+
+  g_imu_soft_i2c_bus.scl_port = IMU_SCL_GPIO_Port;
+  g_imu_soft_i2c_bus.scl_pin = IMU_SCL_Pin;
+  g_imu_soft_i2c_bus.sda_port = IMU_SDA_GPIO_Port;
+  g_imu_soft_i2c_bus.sda_pin = IMU_SDA_Pin;
+  g_imu_soft_i2c_bus.bit_delay_us = 5U;
+  g_imu_soft_i2c_bus.delay_us = App_DelayUs;
+
+  if (drv_encoder_init(&g_encoder_tim2, &htim2, 1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (drv_encoder_init(&g_encoder_tim4, &htim4, 1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (drv_encoder_start(&g_encoder_tim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (drv_encoder_start(&g_encoder_tim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (drv_soft_i2c_init(&g_imu_soft_i2c_bus) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
 
 static void App_UartSendText(const char *text)
 {
@@ -115,6 +186,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
@@ -124,6 +196,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  App_DriversInit();
   App_UartSendText("BOOT,USART1=OK\r\n");
   g_uart_heartbeat_last_ms = HAL_GetTick();
 
@@ -153,6 +226,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -179,6 +253,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
@@ -218,5 +298,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
-
-

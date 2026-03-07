@@ -127,6 +127,11 @@
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/adc.c</locationURI>
 		</link>
 		<link>
+			<name>Application/User/Core/dma.c</name>
+			<type>1</type>
+			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/dma.c</locationURI>
+		</link>
+		<link>
 			<name>Application/User/Core/gpio.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/gpio.c</locationURI>
@@ -155,6 +160,26 @@
 			<name>Application/User/Core/usart.c</name>
 			<type>1</type>
 			<locationURI>PARENT-1-PROJECT_LOC/Core/Src/usart.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_encoder.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_encoder.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_soft_i2c.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_soft_i2c.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_encoder.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_encoder.h</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_soft_i2c.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_soft_i2c.h</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>
