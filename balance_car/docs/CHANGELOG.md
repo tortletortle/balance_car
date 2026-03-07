@@ -45,3 +45,10 @@
 - 明确外设初始化、时钟、GPIO 复用和基础资源配置以 `CubeMX` 生成为基线
 - 明确修改生成文件时优先使用 `USER CODE` 区域，避免破坏再生能力
 - 在 `docs/DECISIONS.md` 中补充 `STM32CubeIDE` 工具链和 `CubeMX` 外设规则相关决策
+
+### [规划] 启动 USART1 外设开启方案
+
+- 新增 `docs/USART1_BRINGUP_PLAN.md`，给出 `USART1` 的 Cube 配置、分层位置、分阶段开启策略和验收方式
+- 明确 `USART1` 第一阶段以 `115200 8N1` 标准异步串口为基线
+- 明确首阶段先做最小发送和基础接收，不直接上 DMA
+- 在 `docs/DECISIONS.md` 中补充 `USART1` 分阶段开启决策
