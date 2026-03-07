@@ -86,6 +86,7 @@ void SystemClock_Config(void);
 
 static void App_UartSendText(const char *text);
 static void App_UartSendFormat(const char *format, ...);
+static void App_ReportResetFlags(void);
 static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z);
 static void App_Mpu6050CalibrateZero(void);
 static void App_Mpu6050ReportRaw(void);
@@ -223,6 +224,36 @@ static void App_UartSendFormat(const char *format, ...)
   (void)HAL_UART_Transmit(&huart1, (uint8_t *)buffer, (uint16_t)len, 100U);
 }
 
+static void App_ReportResetFlags(void)
+{
+  uint32_t csr_value;
+  uint8_t pin_reset;
+  uint8_t por_reset;
+  uint8_t software_reset;
+  uint8_t iwdg_reset;
+  uint8_t wwdg_reset;
+  uint8_t lpwr_reset;
+
+  csr_value = RCC->CSR;
+  pin_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_PINRST) != RESET) ? 1U : 0U;
+  por_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_PORRST) != RESET) ? 1U : 0U;
+  software_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_SFTRST) != RESET) ? 1U : 0U;
+  iwdg_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != RESET) ? 1U : 0U;
+  wwdg_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_WWDGRST) != RESET) ? 1U : 0U;
+  lpwr_reset = (__HAL_RCC_GET_FLAG(RCC_FLAG_LPWRRST) != RESET) ? 1U : 0U;
+
+  App_UartSendFormat("RST,CSR=0x%08lX,PIN=%u,POR=%u,SFT=%u,IWDG=%u,WWDG=%u,LPWR=%u\r\n",
+                    (unsigned long)csr_value,
+                    pin_reset,
+                    por_reset,
+                    software_reset,
+                    iwdg_reset,
+                    wwdg_reset,
+                    lpwr_reset);
+
+  __HAL_RCC_CLEAR_RESET_FLAGS();
+}
+
 static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z)
 {
   float pitch_deg;
@@ -280,7 +311,7 @@ static void App_Mpu6050CalibrateZero(void)
     sum_gyro_y += raw_data.gyro_y;
     sum_gyro_z += raw_data.gyro_z;
 
-    if (((sample_index + 1U) % APP_MPU6050_CAL_PROGRESS_STEP) == 0U)
+    if (((sample_index + 1U) <= 10U) || (((sample_index + 1U) % APP_MPU6050_CAL_PROGRESS_STEP) == 0U))
     {
       App_UartSendFormat("MPU,CAL,IDX=%lu\r\n", (unsigned long)(sample_index + 1U));
     }
@@ -385,6 +416,7 @@ int main(void)
 
   App_DriversInit();
   App_UartSendText("BOOT,USART1=OK\r\n");
+  App_ReportResetFlags();
   App_Mpu6050CalibrateZero();
   g_uart_heartbeat_last_ms = HAL_GetTick();
   g_mpu_report_last_ms = HAL_GetTick();
