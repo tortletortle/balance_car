@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file    stm32f1xx_hal_conf.h
@@ -34,7 +34,7 @@
   */
 
 #define HAL_MODULE_ENABLED
-  /*#define HAL_ADC_MODULE_ENABLED   */
+  #define HAL_ADC_MODULE_ENABLED
 /*#define HAL_CRYP_MODULE_ENABLED   */
 /*#define HAL_CAN_MODULE_ENABLED   */
 /*#define HAL_CAN_LEGACY_MODULE_ENABLED   */
@@ -64,7 +64,7 @@
 /*#define HAL_SMARTCARD_MODULE_ENABLED   */
 /*#define HAL_SPI_MODULE_ENABLED   */
 /*#define HAL_SRAM_MODULE_ENABLED   */
-/*#define HAL_TIM_MODULE_ENABLED   */
+#define HAL_TIM_MODULE_ENABLED
 #define HAL_UART_MODULE_ENABLED
 /*#define HAL_USART_MODULE_ENABLED   */
 /*#define HAL_WWDG_MODULE_ENABLED   */
@@ -388,4 +388,6 @@ void assert_failed(uint8_t* file, uint32_t line);
 #endif
 
 #endif /* __STM32F1xx_HAL_CONF_H */
+
+
 

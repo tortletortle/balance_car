@@ -59,3 +59,11 @@
 - 上电后发送 `BOOT,USART1=OK`
 - 主循环每 1 秒发送一次 `HB,USART1=OK`
 - 本次只做最小发送验证，不引入 DMA、协议解析或驱动层封装
+
+### [实现] 开通板级全部基础外设
+
+- 更新 `Two_balance_car/Two_balance_car.ioc`，把当前板级外设清单补齐到新工程：`ADC1`、`TIM1`、`TIM2`、`TIM3`、`TIM4`、`USART1`、`USART2` 以及板上相关 GPIO
+- 在工程代码中补齐 `adc.c/.h`、`tim.c/.h`、`usart.c/.h`、`gpio.c`、`main.h`、`stm32f1xx_it.c/.h`，使当前工程可直接完成全外设初始化
+- `main.c` 初始化序列已扩展为：`GPIO -> ADC1 -> TIM1 -> TIM2 -> TIM3 -> TIM4 -> USART1 -> USART2`
+- 本次仅完成“外设开通和工程可编译”，未开始驱动封装、外设启动策略和上层业务逻辑
+- 已验证 `STM32CubeIDE` 头less 编译通过

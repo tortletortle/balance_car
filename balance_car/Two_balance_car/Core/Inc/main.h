@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.h
@@ -57,9 +57,32 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define SR04_TRIG_Pin GPIO_PIN_0
+#define SR04_TRIG_GPIO_Port GPIOA
+#define SR04_ECHO_Pin GPIO_PIN_1
+#define SR04_ECHO_GPIO_Port GPIOA
+#define OLED_SCL_Pin GPIO_PIN_8
+#define OLED_SCL_GPIO_Port GPIOB
+#define OLED_SDA_Pin GPIO_PIN_9
+#define OLED_SDA_GPIO_Port GPIOB
+#define IMU_SCL_Pin GPIO_PIN_10
+#define IMU_SCL_GPIO_Port GPIOB
+#define IMU_SDA_Pin GPIO_PIN_11
+#define IMU_SDA_GPIO_Port GPIOB
+#define BIN1_Pin GPIO_PIN_12
+#define BIN1_GPIO_Port GPIOB
+#define BIN2_Pin GPIO_PIN_13
+#define BIN2_GPIO_Port GPIOB
+#define AIN1_Pin GPIO_PIN_14
+#define AIN1_GPIO_Port GPIOB
+#define AIN2_Pin GPIO_PIN_15
+#define AIN2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+#define DRV_EN_Pin GPIO_PIN_4
+#define DRV_EN_GPIO_Port GPIOA
+#define ESTOP_Pin GPIO_PIN_5
+#define ESTOP_GPIO_Port GPIOA
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
