@@ -41,6 +41,14 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+typedef enum
+{
+  APP_IMU_STATE_RETRY_WAIT = 0U,
+  APP_IMU_STATE_SETTLE,
+  APP_IMU_STATE_CALIBRATING,
+  APP_IMU_STATE_RUNNING
+} app_imu_state_t;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -50,6 +58,8 @@
 #define APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS  5U
 #define APP_MPU6050_REPORT_INTERVAL_MS       200U
 #define APP_MPU6050_CAL_PROGRESS_STEP       50U
+#define APP_MPU6050_RETRY_INTERVAL_MS       200U
+#define APP_MPU6050_STARTUP_SETTLE_MS       500U
 #define APP_IMU_BRINGUP_ONLY                1U
 
 /* USER CODE END PD */
@@ -80,6 +90,16 @@ static drv_encoder_t g_encoder_tim4;
 #endif
 static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
 static dev_mpu6050_t g_mpu6050;
+static app_imu_state_t g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
+static uint32_t g_mpu_retry_last_ms = 0U;
+static uint32_t g_mpu_next_action_ms = 0U;
+static uint32_t g_mpu_cal_sample_index = 0U;
+static int64_t g_mpu_cal_sum_accel_x = 0;
+static int64_t g_mpu_cal_sum_accel_y = 0;
+static int64_t g_mpu_cal_sum_accel_z = 0;
+static int64_t g_mpu_cal_sum_gyro_x = 0;
+static int64_t g_mpu_cal_sum_gyro_y = 0;
+static int64_t g_mpu_cal_sum_gyro_z = 0;
 
 /* USER CODE END PV */
 
@@ -93,7 +113,9 @@ static void App_ReportResetFlags(void);
 static void App_DisableUnusedIrq(void);
 static void App_Mpu6050SendCalIndex(uint32_t sample_index);
 static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z);
-static void App_Mpu6050CalibrateZero(void);
+static void App_Mpu6050ResetCalibrationContext(void);
+static void App_Mpu6050FinalizeCalibration(void);
+static void App_Mpu6050Task(void);
 static void App_Mpu6050ReportRaw(void);
 static void App_DelayUsInit(void);
 static void App_DelayUs(uint32_t delay_us);
@@ -137,7 +159,7 @@ static void App_DriversInit(void)
   g_imu_soft_i2c_bus.scl_pin = IMU_SCL_Pin;
   g_imu_soft_i2c_bus.sda_port = IMU_SDA_GPIO_Port;
   g_imu_soft_i2c_bus.sda_pin = IMU_SDA_Pin;
-  g_imu_soft_i2c_bus.bit_delay_us = 10U;
+  g_imu_soft_i2c_bus.bit_delay_us = 20U;
   g_imu_soft_i2c_bus.delay_us = App_DelayUs;
 
 #if APP_IMU_BRINGUP_ONLY == 0U
@@ -177,10 +199,6 @@ static void App_DriversInit(void)
     Error_Handler();
   }
 
-  if (dev_mpu6050_init(&g_mpu6050, &g_dev_mpu6050_default_init_config) != HAL_OK)
-  {
-    Error_Handler();
-  }
 }
 
 static void App_UartSendText(const char *text)
@@ -295,71 +313,28 @@ static int32_t App_Mpu6050EstimatePitchMdeg(int32_t accel_x, int32_t accel_z)
   return (int32_t)(pitch_deg * 1000.0f);
 }
 
-static void App_Mpu6050CalibrateZero(void)
+static void App_Mpu6050ResetCalibrationContext(void)
 {
-  uint32_t sample_index;
-  uint8_t who_am_i = 0U;
-  dev_mpu6050_raw_data_t raw_data = {0};
-  int64_t sum_accel_x = 0;
-  int64_t sum_accel_y = 0;
-  int64_t sum_accel_z = 0;
-  int64_t sum_gyro_x = 0;
-  int64_t sum_gyro_y = 0;
-  int64_t sum_gyro_z = 0;
-
   g_mpu_calibration_ok = 0U;
+  g_mpu_cal_sample_index = 0U;
+  g_mpu_cal_sum_accel_x = 0;
+  g_mpu_cal_sum_accel_y = 0;
+  g_mpu_cal_sum_accel_z = 0;
+  g_mpu_cal_sum_gyro_x = 0;
+  g_mpu_cal_sum_gyro_y = 0;
+  g_mpu_cal_sum_gyro_z = 0;
+}
 
-  if (dev_mpu6050_read_who_am_i(&g_mpu6050, &who_am_i) != HAL_OK)
-  {
-    App_UartSendText("MPU,WHOAMI=READ_ERR\r\n");
-    return;
-  }
-
-  App_UartSendFormat("MPU,WHOAMI=0x%02X\r\n", who_am_i);
-  App_UartSendFormat("MPU,CALIBRATING=%lu\r\n", (unsigned long)APP_MPU6050_ZERO_SAMPLE_COUNT);
-
-  HAL_Delay(500U);
-  App_UartSendText("MPU,CAL,START\r\n");
-
-  if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
-  {
-    App_UartSendText("MPU,CAL,RAW_TEST=ERR\r\n");
-    return;
-  }
-
-  App_UartSendText("MPU,CAL,RAW_TEST=OK\r\n");
-
-  for (sample_index = 0U; sample_index < APP_MPU6050_ZERO_SAMPLE_COUNT; sample_index++)
-  {
-    if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
-    {
-      App_UartSendFormat("MPU,CAL,READ_ERR,IDX=%lu\r\n", (unsigned long)sample_index);
-      return;
-    }
-
-    sum_accel_x += raw_data.accel_x;
-    sum_accel_y += raw_data.accel_y;
-    sum_accel_z += raw_data.accel_z;
-    sum_gyro_x += raw_data.gyro_x;
-    sum_gyro_y += raw_data.gyro_y;
-    sum_gyro_z += raw_data.gyro_z;
-
-    if (((sample_index + 1U) <= 10U) || (((sample_index + 1U) % APP_MPU6050_CAL_PROGRESS_STEP) == 0U))
-    {
-      App_Mpu6050SendCalIndex(sample_index);
-    }
-
-    HAL_Delay(APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS);
-  }
-
+static void App_Mpu6050FinalizeCalibration(void)
+{
   App_UartSendText("MPU,CAL,SUM_OK\r\n");
 
-  g_mpu_accel_zero_x = (int32_t)(sum_accel_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
-  g_mpu_accel_zero_y = (int32_t)(sum_accel_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
-  g_mpu_accel_zero_z = (int32_t)(sum_accel_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
-  g_mpu_gyro_bias_x = (int32_t)(sum_gyro_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
-  g_mpu_gyro_bias_y = (int32_t)(sum_gyro_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
-  g_mpu_gyro_bias_z = (int32_t)(sum_gyro_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_accel_zero_x = (int32_t)(g_mpu_cal_sum_accel_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_accel_zero_y = (int32_t)(g_mpu_cal_sum_accel_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_accel_zero_z = (int32_t)(g_mpu_cal_sum_accel_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_gyro_bias_x = (int32_t)(g_mpu_cal_sum_gyro_x / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_gyro_bias_y = (int32_t)(g_mpu_cal_sum_gyro_y / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
+  g_mpu_gyro_bias_z = (int32_t)(g_mpu_cal_sum_gyro_z / (int64_t)APP_MPU6050_ZERO_SAMPLE_COUNT);
 
   App_UartSendText("MPU,CAL,AVG_OK\r\n");
 
@@ -377,6 +352,107 @@ static void App_Mpu6050CalibrateZero(void)
   App_UartSendFormat("MPU_PITCH_ZERO_MDEG=%ld\r\n", (long)g_mpu_pitch_zero_mdeg);
   App_UartSendText("MPU,CAL=OK\r\n");
   g_mpu_calibration_ok = 1U;
+  g_mpu_state = APP_IMU_STATE_RUNNING;
+  g_mpu_report_last_ms = HAL_GetTick();
+}
+
+static void App_Mpu6050Task(void)
+{
+  uint32_t now_ms;
+  uint8_t who_am_i = 0U;
+  dev_mpu6050_raw_data_t raw_data = {0};
+
+  now_ms = HAL_GetTick();
+
+  switch (g_mpu_state)
+  {
+    case APP_IMU_STATE_RETRY_WAIT:
+      if ((now_ms - g_mpu_retry_last_ms) < APP_MPU6050_RETRY_INTERVAL_MS)
+      {
+        return;
+      }
+
+      g_mpu_retry_last_ms = now_ms;
+      if (dev_mpu6050_init(&g_mpu6050, &g_dev_mpu6050_default_init_config) != HAL_OK)
+      {
+        App_UartSendText("MPU,INIT=RETRY\r\n");
+        return;
+      }
+
+      if (dev_mpu6050_read_who_am_i(&g_mpu6050, &who_am_i) != HAL_OK)
+      {
+        App_UartSendText("MPU,WHOAMI=READ_ERR\r\n");
+        return;
+      }
+
+      App_Mpu6050ResetCalibrationContext();
+      App_UartSendFormat("MPU,WHOAMI=0x%02X\r\n", who_am_i);
+      App_UartSendFormat("MPU,CALIBRATING=%lu\r\n", (unsigned long)APP_MPU6050_ZERO_SAMPLE_COUNT);
+      g_mpu_next_action_ms = now_ms + APP_MPU6050_STARTUP_SETTLE_MS;
+      g_mpu_state = APP_IMU_STATE_SETTLE;
+      return;
+
+    case APP_IMU_STATE_SETTLE:
+      if ((int32_t)(now_ms - g_mpu_next_action_ms) < 0)
+      {
+        return;
+      }
+
+      App_UartSendText("MPU,CAL,START\r\n");
+      if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
+      {
+        App_UartSendText("MPU,CAL,RAW_TEST=ERR\r\n");
+        g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
+        g_mpu_retry_last_ms = now_ms;
+        return;
+      }
+
+      App_UartSendText("MPU,CAL,RAW_TEST=OK\r\n");
+      g_mpu_next_action_ms = now_ms;
+      g_mpu_state = APP_IMU_STATE_CALIBRATING;
+      return;
+
+    case APP_IMU_STATE_CALIBRATING:
+      if ((int32_t)(now_ms - g_mpu_next_action_ms) < 0)
+      {
+        return;
+      }
+
+      if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
+      {
+        App_UartSendFormat("MPU,CAL,READ_ERR,IDX=%lu\r\n", (unsigned long)g_mpu_cal_sample_index);
+        App_Mpu6050ResetCalibrationContext();
+        g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
+        g_mpu_retry_last_ms = now_ms;
+        return;
+      }
+
+      g_mpu_cal_sum_accel_x += raw_data.accel_x;
+      g_mpu_cal_sum_accel_y += raw_data.accel_y;
+      g_mpu_cal_sum_accel_z += raw_data.accel_z;
+      g_mpu_cal_sum_gyro_x += raw_data.gyro_x;
+      g_mpu_cal_sum_gyro_y += raw_data.gyro_y;
+      g_mpu_cal_sum_gyro_z += raw_data.gyro_z;
+
+      if (((g_mpu_cal_sample_index + 1U) <= 10U) || (((g_mpu_cal_sample_index + 1U) % APP_MPU6050_CAL_PROGRESS_STEP) == 0U))
+      {
+        App_Mpu6050SendCalIndex(g_mpu_cal_sample_index);
+      }
+
+      g_mpu_cal_sample_index++;
+      if (g_mpu_cal_sample_index >= APP_MPU6050_ZERO_SAMPLE_COUNT)
+      {
+        App_Mpu6050FinalizeCalibration();
+        return;
+      }
+
+      g_mpu_next_action_ms = now_ms + APP_MPU6050_ZERO_SAMPLE_INTERVAL_MS;
+      return;
+
+    case APP_IMU_STATE_RUNNING:
+    default:
+      return;
+  }
 }
 
 static void App_Mpu6050ReportRaw(void)
@@ -387,6 +463,9 @@ static void App_Mpu6050ReportRaw(void)
   if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
   {
     App_UartSendText("MPU,READ=ERR\r\n");
+    App_Mpu6050ResetCalibrationContext();
+    g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
+    g_mpu_retry_last_ms = HAL_GetTick();
     return;
   }
 
@@ -438,22 +517,22 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-#if APP_IMU_BRINGUP_ONLY == 0U
   MX_ADC1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
-  MX_USART2_UART_Init();
-#endif
   MX_USART1_UART_Init();
-  App_DisableUnusedIrq();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   App_DriversInit();
   App_UartSendText("BOOT,USART1=OK\r\n");
   App_ReportResetFlags();
-  App_Mpu6050CalibrateZero();
+  App_Mpu6050ResetCalibrationContext();
+  g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
+  g_mpu_retry_last_ms = HAL_GetTick() - APP_MPU6050_RETRY_INTERVAL_MS;
+  g_mpu_next_action_ms = HAL_GetTick();
   g_uart_heartbeat_last_ms = HAL_GetTick();
   g_mpu_report_last_ms = HAL_GetTick();
 
@@ -466,13 +545,15 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    App_Mpu6050Task();
+
     if ((HAL_GetTick() - g_uart_heartbeat_last_ms) >= 1000U)
     {
       g_uart_heartbeat_last_ms = HAL_GetTick();
       App_UartSendText("HB,USART1=OK\r\n");
     }
 
-    if ((HAL_GetTick() - g_mpu_report_last_ms) >= APP_MPU6050_REPORT_INTERVAL_MS)
+    if ((g_mpu_state == APP_IMU_STATE_RUNNING) && ((HAL_GetTick() - g_mpu_report_last_ms) >= APP_MPU6050_REPORT_INTERVAL_MS))
     {
       g_mpu_report_last_ms = HAL_GetTick();
       App_Mpu6050ReportRaw();

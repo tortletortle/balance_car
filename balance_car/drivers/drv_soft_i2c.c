@@ -101,7 +101,7 @@ HAL_StatusTypeDef drv_soft_i2c_init(drv_soft_i2c_bus_t *bus)
     drv_soft_i2c_enable_gpio_clock(bus->sda_port);
 
     gpio_init.Mode = GPIO_MODE_OUTPUT_OD;
-    gpio_init.Pull = GPIO_NOPULL;
+    gpio_init.Pull = GPIO_PULLUP;
     gpio_init.Speed = GPIO_SPEED_FREQ_HIGH;
 
     if (bus->sda_port == bus->scl_port)

@@ -1,4 +1,4 @@
-﻿/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file    gpio.c
@@ -41,6 +41,7 @@
 */
 void MX_GPIO_Init(void)
 {
+
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
@@ -48,43 +49,41 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /* Configure output default levels */
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, SR04_TRIG_Pin|DRV_EN_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOB, BIN1_Pin|BIN2_Pin|AIN1_Pin|AIN2_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOB, OLED_SCL_Pin|OLED_SDA_Pin|IMU_SCL_Pin|IMU_SDA_Pin, GPIO_PIN_SET);
 
-  /* SR04_TRIG + DRV_EN */
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, BIN1_Pin|BIN2_Pin|AIN1_Pin|AIN2_Pin
+                          |OLED_SCL_Pin|OLED_SDA_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : SR04_TRIG_Pin DRV_EN_Pin */
   GPIO_InitStruct.Pin = SR04_TRIG_Pin|DRV_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /* SR04_ECHO */
+  /*Configure GPIO pin : SR04_ECHO_Pin */
   GPIO_InitStruct.Pin = SR04_ECHO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(SR04_ECHO_GPIO_Port, &GPIO_InitStruct);
 
-  /* ESTOP */
+  /*Configure GPIO pin : ESTOP_Pin */
   GPIO_InitStruct.Pin = ESTOP_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(ESTOP_GPIO_Port, &GPIO_InitStruct);
 
-  /* Soft-I2C lines for OLED + IMU */
-  GPIO_InitStruct.Pin = OLED_SCL_Pin|OLED_SDA_Pin|IMU_SCL_Pin|IMU_SDA_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /* Motor direction pins */
-  GPIO_InitStruct.Pin = BIN1_Pin|BIN2_Pin|AIN1_Pin|AIN2_Pin;
+  /*Configure GPIO pins : BIN1_Pin BIN2_Pin AIN1_Pin AIN2_Pin
+                           OLED_SCL_Pin OLED_SDA_Pin */
+  GPIO_InitStruct.Pin = BIN1_Pin|BIN2_Pin|AIN1_Pin|AIN2_Pin
+                          |OLED_SCL_Pin|OLED_SDA_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 2 */
