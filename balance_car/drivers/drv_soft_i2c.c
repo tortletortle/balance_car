@@ -121,6 +121,31 @@ HAL_StatusTypeDef drv_soft_i2c_init(drv_soft_i2c_bus_t *bus)
     HAL_GPIO_WritePin(bus->sda_port, bus->sda_pin, GPIO_PIN_SET);
     drv_soft_i2c_delay(bus);
 
+    return drv_soft_i2c_bus_recover(bus);
+}
+
+HAL_StatusTypeDef drv_soft_i2c_bus_recover(drv_soft_i2c_bus_t *bus)
+{
+    uint8_t pulse_index;
+
+    if (drv_soft_i2c_is_valid(bus) == 0U)
+    {
+        return HAL_ERROR;
+    }
+
+    drv_soft_i2c_write_sda(bus, GPIO_PIN_SET);
+    drv_soft_i2c_write_scl(bus, GPIO_PIN_SET);
+
+    for (pulse_index = 0U; pulse_index < 9U; pulse_index++)
+    {
+        drv_soft_i2c_write_scl(bus, GPIO_PIN_RESET);
+        drv_soft_i2c_write_scl(bus, GPIO_PIN_SET);
+    }
+
+    drv_soft_i2c_write_sda(bus, GPIO_PIN_RESET);
+    drv_soft_i2c_write_scl(bus, GPIO_PIN_SET);
+    drv_soft_i2c_write_sda(bus, GPIO_PIN_SET);
+
     return HAL_OK;
 }
 

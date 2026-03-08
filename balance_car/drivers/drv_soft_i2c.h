@@ -18,6 +18,7 @@ typedef struct
 } drv_soft_i2c_bus_t;
 
 HAL_StatusTypeDef drv_soft_i2c_init(drv_soft_i2c_bus_t *bus);
+HAL_StatusTypeDef drv_soft_i2c_bus_recover(drv_soft_i2c_bus_t *bus);
 HAL_StatusTypeDef drv_soft_i2c_start(drv_soft_i2c_bus_t *bus);
 HAL_StatusTypeDef drv_soft_i2c_stop(drv_soft_i2c_bus_t *bus);
 HAL_StatusTypeDef drv_soft_i2c_write_byte_raw(drv_soft_i2c_bus_t *bus, uint8_t byte_value);
