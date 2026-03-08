@@ -2,6 +2,13 @@
 
 ## 2026-03-08
 
+### [收口] 同步 CubeMX 外设工程文件
+
+- 提交 `Two_balance_car.ioc` 与对应生成文件，收口本轮 `NVIC / TIM1 / USART1 / DMA / GPIO` 的外设配置
+- 新增 `Core/Inc/dma.h` 与 `Core/Src/dma.c`，使 `USART1` 的 DMA 资源与 `MX_DMA_Init()` 保持工程一致
+- 同步 `usart.c`、`stm32f1xx_it.c`、`stm32f1xx_it.h`，补齐 `USART1` 相关 DMA 句柄、IRQ 入口与中断声明
+- 同步 `tim.c` 与 `.ioc` 中的中断优先级和 `TIM2` 编码器重映射生成结果，避免 CubeMX 配置与仓库代码继续漂移
+- 清理 `main.h` 中已被生成区覆盖的重复宏定义，减少后续再次生成时的混淆
 ### [重构] 收口 board 与 drv_uart
 
 - 新增 `board/board.c` 与 `board/board.h`，把板级句柄、引脚、方向、默认硬件策略从 `main.c` 抽离到 `board` 层
@@ -56,3 +63,6 @@
 - 从旧工程代码而不是错误图片中提取接线关系，并形成 `docs/WIRING_FROM_CODE.md`
 - 冻结当前板级硬件事实，形成 `docs/HARDWARE_BASELINE.md`
 - 明确参考工程 `balance_v3` 只作为参考资产，不直接照搬实现
+
+
+

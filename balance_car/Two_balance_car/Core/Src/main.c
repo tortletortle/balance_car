@@ -109,7 +109,7 @@ int main(void)
   {
     Error_Handler();
   }
-/* USER CODE END 2 */
+  /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -123,7 +123,7 @@ int main(void)
       Error_Handler();
     }
   }
-/* USER CODE END 3 */
+  /* USER CODE END 3 */
 }
 
 /**
