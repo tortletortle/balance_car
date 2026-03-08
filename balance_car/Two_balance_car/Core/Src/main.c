@@ -61,6 +61,8 @@ typedef enum
 #define APP_MPU6050_RETRY_INTERVAL_MS       200U
 #define APP_MPU6050_STARTUP_SETTLE_MS       500U
 #define APP_IMU_BRINGUP_ONLY                1U
+#define APP_DELAY_US_USE_DWT                0U
+#define APP_DELAY_US_NOP_INNER_LOOP        48U
 
 /* USER CODE END PD */
 
@@ -130,13 +132,16 @@ static void App_DriversInit(void);
 
 static void App_DelayUsInit(void)
 {
+#if APP_DELAY_US_USE_DWT == 1U
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
   DWT->CYCCNT = 0U;
+#endif
 }
 
 static void App_DelayUs(uint32_t delay_us)
 {
+#if APP_DELAY_US_USE_DWT == 1U
   uint32_t start_cycle;
   uint32_t wait_cycles;
 
@@ -151,6 +156,18 @@ static void App_DelayUs(uint32_t delay_us)
   while ((DWT->CYCCNT - start_cycle) < wait_cycles)
   {
   }
+#else
+  volatile uint32_t outer_count;
+  volatile uint32_t inner_count;
+
+  for (outer_count = 0U; outer_count < delay_us; outer_count++)
+  {
+    for (inner_count = 0U; inner_count < APP_DELAY_US_NOP_INNER_LOOP; inner_count++)
+    {
+      __NOP();
+    }
+  }
+#endif
 }
 
 static void App_DriversInit(void)

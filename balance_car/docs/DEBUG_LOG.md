@@ -18,3 +18,9 @@
 
 - Split the repeated-start read-address phase into `RD_ARS` (address byte send) and `RD_ARA` (address ACK).
 - Keep other diagnostic stages unchanged so the next halt snapshot can distinguish bit-send vs ACK wait.
+
+## 2026-03-08 - NOP delay A/B test
+
+- Add a build-time switch in `main.c` to choose DWT or NOP-based microsecond delay.
+- Set the current test build to `NOP` delay to compare soft I2C stability against the previous DWT version.
+- Keep `bit_delay_us` unchanged so the only meaningful variable in this A/B step is the delay implementation.
