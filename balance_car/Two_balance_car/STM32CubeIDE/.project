@@ -226,5 +226,15 @@
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/control/ctrl_attitude_estimator.h</locationURI>
 		</link>
+		<link>
+			<name>Application/User/Control/ctrl_angle_loop.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/control/ctrl_angle_loop.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Control/ctrl_angle_loop.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/control/ctrl_angle_loop.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>
