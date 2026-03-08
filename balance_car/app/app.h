@@ -94,6 +94,7 @@ typedef struct
     uint8_t arm_request;
     uint8_t vofa_enabled;
     uint8_t imu_ready_seen;
+    uint8_t uart_rx_it_byte;
     int32_t target_pitch_mdeg;
     uint32_t last_attitude_update_ms;
     ctrl_attitude_estimator_output_t last_attitude_output;
@@ -106,5 +107,7 @@ extern const app_logic_config_t g_app_default_logic_config;
 HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_ms);
 void app_reset(app_t *app, uint32_t now_ms);
 HAL_StatusTypeDef app_task(app_t *app, uint32_t now_ms);
+HAL_StatusTypeDef app_on_uart_rx_cplt(app_t *app, UART_HandleTypeDef *huart);
+HAL_StatusTypeDef app_on_uart_error(app_t *app, UART_HandleTypeDef *huart);
 
 #endif

@@ -76,6 +76,27 @@ const app_logic_config_t g_app_default_logic_config =
     50U
 };
 
+static HAL_StatusTypeDef app_uart_start_receive_it(app_t *app)
+{
+    if ((app == NULL) || (app->config.hw.huart_debug == NULL))
+    {
+        return HAL_ERROR;
+    }
+
+    if (HAL_UART_Receive_IT(app->config.hw.huart_debug, &app->uart_rx_it_byte, 1U) == HAL_OK)
+    {
+        return HAL_OK;
+    }
+
+    (void)HAL_UART_AbortReceive(app->config.hw.huart_debug);
+    if (HAL_UART_Receive_IT(app->config.hw.huart_debug, &app->uart_rx_it_byte, 1U) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
+
+    return HAL_OK;
+}
+
 static uint8_t app_is_estop_active(const app_t *app)
 {
     GPIO_PinState pin_state;
@@ -464,6 +485,10 @@ HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_
     }
 
     app_reset(app, now_ms);
+    if (app_uart_start_receive_it(app) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
     app_telemetry_send_boot(&app->telemetry);
     app_telemetry_send_reset_flags(&app->telemetry);
     app_telemetry_send_format(&app->telemetry,
@@ -574,4 +599,36 @@ HAL_StatusTypeDef app_task(app_t *app, uint32_t now_ms)
     }
 
     return HAL_OK;
+}
+
+HAL_StatusTypeDef app_on_uart_rx_cplt(app_t *app, UART_HandleTypeDef *huart)
+{
+    if ((app == NULL) || (huart == NULL) || (app->config.hw.huart_debug == NULL))
+    {
+        return HAL_ERROR;
+    }
+
+    if (huart != app->config.hw.huart_debug)
+    {
+        return HAL_OK;
+    }
+
+    app_command_feed_byte(&app->command, app->uart_rx_it_byte);
+    return app_uart_start_receive_it(app);
+}
+
+HAL_StatusTypeDef app_on_uart_error(app_t *app, UART_HandleTypeDef *huart)
+{
+    if ((app == NULL) || (huart == NULL) || (app->config.hw.huart_debug == NULL))
+    {
+        return HAL_ERROR;
+    }
+
+    if (huart != app->config.hw.huart_debug)
+    {
+        return HAL_OK;
+    }
+
+    __HAL_UART_CLEAR_OREFLAG(huart);
+    return app_uart_start_receive_it(app);
 }

@@ -1,39 +1,17 @@
 ﻿#include "app_command.h"
 
 #include <ctype.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-
-#define APP_COMMAND_RX_PROBE_ENABLE 1U
-
-static void app_command_probe_rx_byte(UART_HandleTypeDef *huart, uint8_t rx_byte)
+static uint16_t app_command_advance_index(uint16_t index)
 {
-    char buffer[40];
-    int length;
-    char text_char;
-
-#if APP_COMMAND_RX_PROBE_ENABLE == 0U
-    (void)huart;
-    (void)rx_byte;
-#else
-    if (huart == NULL)
+    index++;
+    if (index >= APP_COMMAND_RX_FIFO_SIZE)
     {
-        return;
+        index = 0U;
     }
-
-    text_char = ((rx_byte >= 32U) && (rx_byte <= 126U)) ? (char)rx_byte : '.';
-    length = snprintf(buffer, sizeof(buffer), "RX,BYTE=0x%02X,CHAR=%c\r\n", rx_byte, text_char);
-    if (length > 0)
-    {
-        if (length >= (int)sizeof(buffer))
-        {
-            length = (int)sizeof(buffer) - 1;
-        }
-        (void)HAL_UART_Transmit(huart, (uint8_t *)buffer, (uint16_t)length, 100U);
-    }
-#endif
+    return index;
 }
 
 const app_command_config_t g_app_command_default_config =
@@ -258,7 +236,30 @@ void app_command_reset(app_command_t *command)
     }
 
     command->line_length = 0U;
+    command->rx_write_index = 0U;
+    command->rx_read_index = 0U;
+    command->rx_overflow_count = 0U;
     command->line_buffer[0] = '\0';
+}
+
+void app_command_feed_byte(app_command_t *command, uint8_t rx_byte)
+{
+    uint16_t next_write_index;
+
+    if ((command == NULL) || (command->initialized == 0U))
+    {
+        return;
+    }
+
+    next_write_index = app_command_advance_index(command->rx_write_index);
+    if (next_write_index == command->rx_read_index)
+    {
+        command->rx_overflow_count++;
+        return;
+    }
+
+    command->rx_fifo[command->rx_write_index] = rx_byte;
+    command->rx_write_index = next_write_index;
 }
 
 HAL_StatusTypeDef app_command_poll(app_command_t *command,
@@ -266,23 +267,19 @@ HAL_StatusTypeDef app_command_poll(app_command_t *command,
                                    app_command_result_t *result)
 {
     uint8_t rx_byte;
-    HAL_StatusTypeDef status;
 
-    if ((command == NULL) || (huart == NULL) || (result == NULL) || (command->initialized == 0U))
+    (void)huart;
+
+    if ((command == NULL) || (result == NULL) || (command->initialized == 0U))
     {
         return HAL_ERROR;
     }
 
     app_command_clear_result(result);
-    while (1)
+    while (command->rx_read_index != command->rx_write_index)
     {
-        status = HAL_UART_Receive(huart, &rx_byte, 1U, 0U);
-        if (status != HAL_OK)
-        {
-            return HAL_OK;
-        }
-
-        app_command_probe_rx_byte(huart, rx_byte);
+        rx_byte = command->rx_fifo[command->rx_read_index];
+        command->rx_read_index = app_command_advance_index(command->rx_read_index);
 
         if ((rx_byte == '\r') || (rx_byte == '\n'))
         {
@@ -311,4 +308,6 @@ HAL_StatusTypeDef app_command_poll(app_command_t *command,
             return HAL_OK;
         }
     }
+
+    return HAL_OK;
 }
