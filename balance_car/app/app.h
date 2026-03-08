@@ -26,6 +26,31 @@
 
 typedef struct
 {
+    const char *name;
+    int8_t encoder_hw_direction_a;
+    int8_t encoder_hw_direction_b;
+    int8_t encoder_speed_sign_a;
+    int8_t encoder_speed_sign_b;
+    int8_t motor_command_sign_a;
+    int8_t motor_command_sign_b;
+    uint8_t speed_enable_closed_loop;
+    int16_t speed_cmd_to_delta_div;
+    int16_t speed_kp_q8;
+    int16_t speed_ki_q8;
+    int32_t speed_i_accum_limit;
+    int16_t speed_pwm_limit;
+    int16_t motor_pwm_limit;
+    int16_t motor_deadzone_pwm_fwd;
+    int16_t motor_deadzone_pwm_rev;
+    int16_t deadzone_comp_min_cmd;
+    int16_t motor_ramp_step;
+    uint16_t encoder_counts_per_rev;
+    uint16_t gear_ratio_x100;
+    uint16_t wheel_radius_mm;
+} app_motor_profile_t;
+
+typedef struct
+{
     mod_imu_config_t imu_config;
     ctrl_attitude_estimator_config_t attitude_config;
     ctrl_angle_loop_config_t angle_loop_config;
@@ -35,6 +60,7 @@ typedef struct
     mod_safety_config_t safety_config;
     app_scheduler_config_t scheduler_config;
     app_command_config_t command_config;
+    app_motor_profile_t motor_profile;
     int32_t initial_target_pitch_mdeg;
     uint32_t imu_stale_timeout_ms;
 } app_logic_config_t;
@@ -81,7 +107,9 @@ typedef struct
     ctrl_speed_loop_output_t last_speed_output;
 } app_t;
 
-extern const app_logic_config_t g_app_default_logic_config;
+extern const app_motor_profile_t g_app_default_motor_profile;
+
+HAL_StatusTypeDef app_logic_config_load_default(app_logic_config_t *config);
 
 HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_ms);
 void app_reset(app_t *app, uint32_t now_ms);

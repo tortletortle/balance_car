@@ -103,7 +103,10 @@ int main(void)
   {
     Error_Handler();
   }
-  app_config.logic = g_app_default_logic_config;
+  if (app_logic_config_load_default(&app_config.logic) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   if (app_init(&g_app, &app_config, HAL_GetTick()) != HAL_OK)
   {

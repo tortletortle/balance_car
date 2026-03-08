@@ -2,9 +2,101 @@
 
 #include <string.h>
 
-const app_logic_config_t g_app_default_logic_config =
+const app_motor_profile_t g_app_default_motor_profile =
 {
+    "CURRENT_BASE",
+    1,
+    1,
+    1,
+    -1,
+    1,
+    1,
+    0U,
+    100,
+    2304,
+    64,
+    4000,
+    1780,
+    1780,
+    900,
+    980,
+    80,
+    80,
+    0U,
+    0U,
+    0U
+};
+
+static uint8_t app_is_valid_sign(int8_t value)
+{
+    return ((value == 1) || (value == -1)) ? 1U : 0U;
+}
+
+static HAL_StatusTypeDef app_sync_motor_profile(app_logic_config_t *logic, board_hw_config_t *hw)
+{
+    const app_motor_profile_t *profile;
+
+    if (logic == NULL)
     {
+        return HAL_ERROR;
+    }
+
+    profile = &logic->motor_profile;
+    if ((profile->name == NULL) ||
+        (app_is_valid_sign(profile->encoder_hw_direction_a) == 0U) ||
+        (app_is_valid_sign(profile->encoder_hw_direction_b) == 0U) ||
+        (app_is_valid_sign(profile->encoder_speed_sign_a) == 0U) ||
+        (app_is_valid_sign(profile->encoder_speed_sign_b) == 0U) ||
+        (app_is_valid_sign(profile->motor_command_sign_a) == 0U) ||
+        (app_is_valid_sign(profile->motor_command_sign_b) == 0U) ||
+        (profile->speed_cmd_to_delta_div <= 0) ||
+        (profile->speed_i_accum_limit <= 0) ||
+        (profile->speed_pwm_limit <= 0) ||
+        (profile->motor_pwm_limit <= 0) ||
+        (profile->motor_deadzone_pwm_fwd < 0) ||
+        (profile->motor_deadzone_pwm_rev < 0) ||
+        (profile->deadzone_comp_min_cmd < 0) ||
+        (profile->motor_ramp_step <= 0))
+    {
+        return HAL_ERROR;
+    }
+
+    if (hw != NULL)
+    {
+        hw->encoder_a_direction = profile->encoder_hw_direction_a;
+        hw->encoder_b_direction = profile->encoder_hw_direction_b;
+    }
+
+    logic->speed_loop_config.enable_closed_loop = profile->speed_enable_closed_loop;
+    logic->speed_loop_config.cmd_to_delta_div = profile->speed_cmd_to_delta_div;
+    logic->speed_loop_config.encoder_a_sign = profile->encoder_speed_sign_a;
+    logic->speed_loop_config.encoder_b_sign = profile->encoder_speed_sign_b;
+    logic->speed_loop_config.kp_q8 = profile->speed_kp_q8;
+    logic->speed_loop_config.ki_q8 = profile->speed_ki_q8;
+    logic->speed_loop_config.i_accum_limit = profile->speed_i_accum_limit;
+    logic->speed_loop_config.pwm_limit = profile->speed_pwm_limit;
+    logic->speed_loop_config.startup_pwm_fwd = profile->motor_deadzone_pwm_fwd;
+    logic->speed_loop_config.startup_pwm_rev = profile->motor_deadzone_pwm_rev;
+    logic->speed_loop_config.startup_assist_min_cmd = profile->deadzone_comp_min_cmd;
+
+    logic->motor_config.pwm_limit = profile->motor_pwm_limit;
+    logic->motor_config.ramp_step = profile->motor_ramp_step;
+    logic->motor_config.command_sign_motor_a = profile->motor_command_sign_a;
+    logic->motor_config.command_sign_motor_b = profile->motor_command_sign_b;
+
+    return HAL_OK;
+}
+
+HAL_StatusTypeDef app_logic_config_load_default(app_logic_config_t *config)
+{
+    if (config == NULL)
+    {
+        return HAL_ERROR;
+    }
+
+    memset(config, 0, sizeof(*config));
+
+    config->imu_config = (mod_imu_config_t){
         300U,
         5U,
         10U,
@@ -12,13 +104,13 @@ const app_logic_config_t g_app_default_logic_config =
         200U,
         500U,
         &g_dev_mpu6050_default_init_config
-    },
-    {
+    };
+    config->attitude_config = (ctrl_attitude_estimator_config_t){
         0.98f,
         131.0f,
         50U
-    },
-    {
+    };
+    config->angle_loop_config = (ctrl_angle_loop_config_t){
         10U,
         2816,
         16,
@@ -33,25 +125,8 @@ const app_logic_config_t g_app_default_logic_config =
         0,
         0,
         5
-    },
-    {
-        0U,
-        100,
-        1,
-        -1,
-        2304,
-        64,
-        4000,
-        1780,
-        900,
-        980,
-        80
-    },
-    {
-        1780,
-        80
-    },
-    {
+    };
+    config->battery_config = (mod_battery_monitor_config_t){
         8U,
         3U,
         3300U,
@@ -59,24 +134,28 @@ const app_logic_config_t g_app_default_logic_config =
         1U,
         6600U,
         7000U
-    },
-    {
+    };
+    config->safety_config = (mod_safety_config_t){
         1U
-    },
-    {
+    };
+    config->scheduler_config = (app_scheduler_config_t){
         1000U,
         50U,
         10U,
         200U
-    },
-    {
+    };
+    config->command_config = (app_command_config_t){
         63U
-    },
-    0,
-    50U
-};
+    };
+    config->motor_profile = g_app_default_motor_profile;
+    config->initial_target_pitch_mdeg = 0;
+    config->imu_stale_timeout_ms = 50U;
+
+    return app_sync_motor_profile(config, NULL);
+}
 
 static HAL_StatusTypeDef app_uart_start_receive_it(app_t *app)
+
 {
     if (app == NULL)
     {
@@ -470,7 +549,11 @@ HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_
 
     memset(app, 0, sizeof(*app));
     app->config = *config;
-    app->target_pitch_mdeg = config->logic.initial_target_pitch_mdeg;
+    if (app_sync_motor_profile(&app->config.logic, &app->config.hw) != HAL_OK)
+    {
+        return HAL_ERROR;
+    }
+    app->target_pitch_mdeg = app->config.logic.initial_target_pitch_mdeg;
     app->vofa_enabled = 1U;
 
     if ((app_init_drivers(app) != HAL_OK) || (app_init_modules(app) != HAL_OK))
@@ -489,6 +572,27 @@ HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_
                               "MOTOR,CHAIN=OK,EXEC=%u,ESTOP=%u\r\n",
                               (unsigned int)app->config.hw.motor_output_enable,
                               (unsigned int)app_is_estop_active(app));
+    app_telemetry_send_format(&app->telemetry,
+                              "MOTOR,PROFILE=%s,HWDIR=%d,%d,ESIGN=%d,%d,MSIGN=%d,%d,PWM=%d,RAMP=%d\r\n",
+                              app->config.logic.motor_profile.name,
+                              app->config.logic.motor_profile.encoder_hw_direction_a,
+                              app->config.logic.motor_profile.encoder_hw_direction_b,
+                              app->config.logic.motor_profile.encoder_speed_sign_a,
+                              app->config.logic.motor_profile.encoder_speed_sign_b,
+                              app->config.logic.motor_profile.motor_command_sign_a,
+                              app->config.logic.motor_profile.motor_command_sign_b,
+                              app->config.logic.motor_profile.motor_pwm_limit,
+                              app->config.logic.motor_profile.motor_ramp_step);
+    app_telemetry_send_format(&app->telemetry,
+                              "MOTOR,TUNE,CL=%u,DIV=%d,DEAD=%d,%d,MIN=%d,CPR=%u,GEAR=%u,R=%u\r\n",
+                              (unsigned int)app->config.logic.motor_profile.speed_enable_closed_loop,
+                              app->config.logic.motor_profile.speed_cmd_to_delta_div,
+                              app->config.logic.motor_profile.motor_deadzone_pwm_fwd,
+                              app->config.logic.motor_profile.motor_deadzone_pwm_rev,
+                              app->config.logic.motor_profile.deadzone_comp_min_cmd,
+                              (unsigned int)app->config.logic.motor_profile.encoder_counts_per_rev,
+                              (unsigned int)app->config.logic.motor_profile.gear_ratio_x100,
+                              (unsigned int)app->config.logic.motor_profile.wheel_radius_mm);
     return HAL_OK;
 }
 

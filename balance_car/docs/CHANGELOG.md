@@ -2,6 +2,13 @@
 
 ## 2026-03-08
 
+### [Refactor] Motor profile parameterization
+
+- Add `app_motor_profile_t` to centralize motor-change-sensitive parameters: encoder direction, speed-loop signs, drive-chain signs, PWM limits, deadzone compensation, ramp and mechanical metadata.
+- Add `app_logic_config_load_default()` so the default logic config is assembled from one profile instead of a large scattered initializer.
+- Sync `motor_profile` into board encoder direction, `ctrl_speed_loop` and `mod_motor` during `app_init()`, so future motor swaps mostly change the profile rather than business logic.
+- Add left/right motor command sign fields in `mod_motor`, so motor polarity changes no longer require touching the control chain.
+
 ### [收口] 同步 CubeMX 外设工程文件
 
 - 提交 `Two_balance_car.ioc` 与对应生成文件，收口本轮 `NVIC / TIM1 / USART1 / DMA / GPIO` 的外设配置

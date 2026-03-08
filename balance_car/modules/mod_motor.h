@@ -10,6 +10,8 @@ typedef struct
 {
     int16_t pwm_limit;
     int16_t ramp_step;
+    int8_t command_sign_motor_a;
+    int8_t command_sign_motor_b;
 } mod_motor_config_t;
 
 typedef struct

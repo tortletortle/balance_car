@@ -3,7 +3,9 @@
 const mod_motor_config_t g_mod_motor_default_config =
 {
     1800,
-    70
+    70,
+    1,
+    1
 };
 
 static int16_t mod_motor_clamp_i16(int32_t value, int16_t min_value, int16_t max_value)
@@ -69,7 +71,9 @@ HAL_StatusTypeDef mod_motor_init(mod_motor_t *motor,
         return HAL_ERROR;
     }
 
-    if ((config->pwm_limit <= 0) || (config->ramp_step <= 0))
+    if ((config->pwm_limit <= 0) || (config->ramp_step <= 0) ||
+        ((config->command_sign_motor_a != 1) && (config->command_sign_motor_a != -1)) ||
+        ((config->command_sign_motor_b != 1) && (config->command_sign_motor_b != -1)))
     {
         return HAL_ERROR;
     }
@@ -127,6 +131,8 @@ void mod_motor_set_targets(mod_motor_t *motor, int16_t target_pwm_motor_a, int16
         return;
     }
 
+    target_pwm_motor_a = (int16_t)(target_pwm_motor_a * motor->config.command_sign_motor_a);
+    target_pwm_motor_b = (int16_t)(target_pwm_motor_b * motor->config.command_sign_motor_b);
     motor->target_pwm_motor_a = mod_motor_clamp_i16(target_pwm_motor_a,
                                                     (int16_t)(-motor->config.pwm_limit),
                                                     motor->config.pwm_limit);
