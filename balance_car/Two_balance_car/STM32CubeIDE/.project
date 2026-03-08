@@ -206,5 +206,15 @@
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/devices/dev_mpu6050_reg.h</locationURI>
 		</link>
+		<link>
+			<name>Application/User/Modules/mod_imu.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/modules/mod_imu.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Modules/mod_imu.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/modules/mod_imu.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>
