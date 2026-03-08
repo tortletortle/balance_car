@@ -216,5 +216,15 @@
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/modules/mod_imu.h</locationURI>
 		</link>
+		<link>
+			<name>Application/User/Control/ctrl_attitude_estimator.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/control/ctrl_attitude_estimator.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Control/ctrl_attitude_estimator.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/control/ctrl_attitude_estimator.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

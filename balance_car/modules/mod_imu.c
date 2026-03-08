@@ -6,7 +6,7 @@ const mod_imu_config_t g_mod_imu_default_config =
 {
     300U,
     5U,
-    200U,
+    10U,
     50U,
     200U,
     500U,

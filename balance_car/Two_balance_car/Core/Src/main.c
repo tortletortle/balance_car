@@ -33,6 +33,7 @@
 #include "drv_encoder.h"
 #include "drv_soft_i2c.h"
 #include "mod_imu.h"
+#include "ctrl_attitude_estimator.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +57,7 @@
 
 /* USER CODE BEGIN PV */
 static uint32_t g_uart_heartbeat_last_ms = 0U;
-static uint32_t g_imu_report_last_ms = 0U;
+static uint32_t g_attitude_report_last_ms = 0U;
 #if APP_IMU_BRINGUP_ONLY == 0U
 static drv_adc_t g_battery_adc;
 static drv_encoder_t g_encoder_tim2;
@@ -65,6 +66,7 @@ static drv_encoder_t g_encoder_tim4;
 static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
 static dev_mpu6050_t g_mpu6050;
 static mod_imu_t g_imu_module;
+static ctrl_attitude_estimator_t g_attitude_estimator;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -75,7 +77,10 @@ static void App_UartSendFormat(const char *format, ...);
 static void App_ReportResetFlags(void);
 static void App_ImuSendCalIndex(uint32_t sample_index);
 static void App_ImuHandleEvent(mod_imu_event_t event);
-static void App_ImuReportRaw(void);
+static void App_AttitudeEstimatorReset(void);
+static int App_FormatSignedMilli(char *buffer, uint32_t buffer_size, int32_t value);
+static void App_VofaSendAttitude(const ctrl_attitude_estimator_output_t *output);
+static void App_AttitudeEstimateAndReportVofa(void);
 static const char *App_SoftI2cDiagStageText(uint8_t stage);
 static void App_ReportSoftI2cDiag(const char *prefix);
 static void App_DelayUsInit(void);
@@ -317,6 +322,74 @@ static void App_ImuSendCalIndex(uint32_t sample_index)
   App_UartSendText(text);
 }
 
+static void App_AttitudeEstimatorReset(void)
+{
+  ctrl_attitude_estimator_reset(&g_attitude_estimator);
+  g_attitude_report_last_ms = HAL_GetTick();
+}
+
+static int App_FormatSignedMilli(char *buffer, uint32_t buffer_size, int32_t value)
+{
+  uint32_t absolute_value;
+
+  if ((buffer == NULL) || (buffer_size == 0U))
+  {
+    return -1;
+  }
+
+  if (value < 0)
+  {
+    absolute_value = (uint32_t)(-((int64_t)value));
+    return snprintf(buffer,
+                    (size_t)buffer_size,
+                    "-%lu.%03lu",
+                    (unsigned long)(absolute_value / 1000U),
+                    (unsigned long)(absolute_value % 1000U));
+  }
+
+  absolute_value = (uint32_t)value;
+  return snprintf(buffer,
+                  (size_t)buffer_size,
+                  "%lu.%03lu",
+                  (unsigned long)(absolute_value / 1000U),
+                  (unsigned long)(absolute_value % 1000U));
+}
+
+static void App_VofaSendAttitude(const ctrl_attitude_estimator_output_t *output)
+{
+  char channel_1[20];
+  char channel_2[20];
+  char channel_3[20];
+  char channel_4[20];
+
+  if (output == NULL)
+  {
+    return;
+  }
+
+  if (App_FormatSignedMilli(channel_1, sizeof(channel_1), output->pitch_accel_mdeg) <= 0)
+  {
+    return;
+  }
+
+  if (App_FormatSignedMilli(channel_2, sizeof(channel_2), output->pitch_gyro_mdeg) <= 0)
+  {
+    return;
+  }
+
+  if (App_FormatSignedMilli(channel_3, sizeof(channel_3), output->pitch_fused_mdeg) <= 0)
+  {
+    return;
+  }
+
+  if (App_FormatSignedMilli(channel_4, sizeof(channel_4), output->pitch_rate_mdps) <= 0)
+  {
+    return;
+  }
+
+  App_UartSendFormat("%s,%s,%s,%s\r\n", channel_1, channel_2, channel_3, channel_4);
+}
+
 static void App_ImuHandleEvent(mod_imu_event_t event)
 {
   const mod_imu_calibration_t *calibration;
@@ -326,20 +399,24 @@ static void App_ImuHandleEvent(mod_imu_event_t event)
   switch (event.id)
   {
     case MOD_IMU_EVENT_INIT_RETRY:
+      App_AttitudeEstimatorReset();
       App_UartSendText("MPU,INIT=RETRY\r\n");
       return;
 
     case MOD_IMU_EVENT_WHOAMI_READ_ERR:
+      App_AttitudeEstimatorReset();
       App_UartSendText("MPU,WHOAMI=READ_ERR\r\n");
       App_ReportSoftI2cDiag("MPU,WHOAMI");
       return;
 
     case MOD_IMU_EVENT_WHOAMI_OK:
+      App_AttitudeEstimatorReset();
       App_UartSendFormat("MPU,WHOAMI=0x%02X\r\n", event.who_am_i);
       App_UartSendFormat("MPU,CALIBRATING=%lu\r\n", (unsigned long)g_imu_module.config.zero_sample_count);
       return;
 
     case MOD_IMU_EVENT_RAW_TEST_ERR:
+      App_AttitudeEstimatorReset();
       App_UartSendText("MPU,CAL,START\r\n");
       App_UartSendText("MPU,CAL,RAW_TEST=ERR\r\n");
       App_ReportSoftI2cDiag("MPU,CAL");
@@ -355,6 +432,7 @@ static void App_ImuHandleEvent(mod_imu_event_t event)
       return;
 
     case MOD_IMU_EVENT_CAL_READ_ERR:
+      App_AttitudeEstimatorReset();
       App_UartSendFormat("MPU,CAL,READ_ERR,IDX=%lu\r\n", (unsigned long)event.sample_index);
       App_ReportSoftI2cDiag("MPU,CAL");
       return;
@@ -378,7 +456,7 @@ static void App_ImuHandleEvent(mod_imu_event_t event)
                         (long)calibration->accel_zero_z);
       App_UartSendFormat("MPU_PITCH_ZERO_MDEG=%ld\r\n", (long)calibration->pitch_zero_mdeg);
       App_UartSendText("MPU,CAL=OK\r\n");
-      g_imu_report_last_ms = HAL_GetTick();
+      App_AttitudeEstimatorReset();
       return;
 
     case MOD_IMU_EVENT_NONE:
@@ -387,29 +465,40 @@ static void App_ImuHandleEvent(mod_imu_event_t event)
   }
 }
 
-static void App_ImuReportRaw(void)
+static void App_AttitudeEstimateAndReportVofa(void)
 {
-  mod_imu_report_t report;
+  mod_imu_report_t imu_report;
+  ctrl_attitude_estimator_input_t estimator_input;
+  ctrl_attitude_estimator_output_t estimator_output;
+  uint32_t now_ms;
 
-  if (mod_imu_read_report(&g_imu_module, HAL_GetTick(), &report) != HAL_OK)
+  now_ms = HAL_GetTick();
+  if (mod_imu_read_report(&g_imu_module, now_ms, &imu_report) != HAL_OK)
   {
     App_UartSendText("MPU,READ=ERR\r\n");
     App_ReportSoftI2cDiag("MPU,READ");
+    App_AttitudeEstimatorReset();
     return;
   }
 
-  App_UartSendFormat("MPU_RAW,CAL=%u,AX=%d,AY=%d,AZ=%d,GX=%d,GY=%d,GZ=%d,GX0=%ld,GY0=%ld,GZ0=%ld,PITCH0=%ld\r\n",
-                    report.calibration_ok,
-                    report.raw_data.accel_x,
-                    report.raw_data.accel_y,
-                    report.raw_data.accel_z,
-                    report.raw_data.gyro_x,
-                    report.raw_data.gyro_y,
-                    report.raw_data.gyro_z,
-                    (long)report.gyro_x_zero_relative,
-                    (long)report.gyro_y_zero_relative,
-                    (long)report.gyro_z_zero_relative,
-                    (long)report.pitch_zero_relative_mdeg);
+  if (imu_report.calibration_ok == 0U)
+  {
+    App_AttitudeEstimatorReset();
+    return;
+  }
+
+  estimator_input.pitch_accel_mdeg = imu_report.pitch_zero_relative_mdeg;
+  estimator_input.pitch_rate_lsb = imu_report.gyro_y_zero_relative;
+  if (ctrl_attitude_estimator_update(&g_attitude_estimator,
+                                     &estimator_input,
+                                     now_ms,
+                                     &estimator_output) != HAL_OK)
+  {
+    App_AttitudeEstimatorReset();
+    return;
+  }
+
+  App_VofaSendAttitude(&estimator_output);
 }
 /* USER CODE END 0 */
 
@@ -460,9 +549,16 @@ int main(void)
     Error_Handler();
   }
 
+  if (ctrl_attitude_estimator_init(&g_attitude_estimator,
+                                   &g_ctrl_attitude_estimator_default_config) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
   mod_imu_reset(&g_imu_module, HAL_GetTick());
+  App_AttitudeEstimatorReset();
   g_uart_heartbeat_last_ms = HAL_GetTick();
-  g_imu_report_last_ms = HAL_GetTick();
+  g_attitude_report_last_ms = HAL_GetTick();
 /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -487,10 +583,10 @@ int main(void)
 
     if ((mod_imu_is_running(&g_imu_module) != 0U) &&
         (g_imu_module.config.report_interval_ms > 0U) &&
-        ((now_ms - g_imu_report_last_ms) >= g_imu_module.config.report_interval_ms))
+        ((now_ms - g_attitude_report_last_ms) >= g_imu_module.config.report_interval_ms))
     {
-      g_imu_report_last_ms = now_ms;
-      App_ImuReportRaw();
+      g_attitude_report_last_ms = now_ms;
+      App_AttitudeEstimateAndReportVofa();
     }
   }
   /* USER CODE END 3 */
