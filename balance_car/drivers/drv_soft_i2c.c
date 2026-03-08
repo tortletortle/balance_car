@@ -1,5 +1,36 @@
 #include "drv_soft_i2c.h"
 
+static volatile drv_soft_i2c_diag_t g_drv_soft_i2c_diag = {0};
+
+static void drv_soft_i2c_diag_update(drv_soft_i2c_diag_stage_t stage, uint8_t ack_bit, uint8_t device_addr7, uint8_t reg_addr, uint16_t index, uint16_t length)
+{
+    g_drv_soft_i2c_diag.stage = (uint8_t)stage;
+    g_drv_soft_i2c_diag.ack_bit = ack_bit;
+    g_drv_soft_i2c_diag.device_addr7 = device_addr7;
+    g_drv_soft_i2c_diag.reg_addr = reg_addr;
+    g_drv_soft_i2c_diag.index = index;
+    g_drv_soft_i2c_diag.length = length;
+}
+
+void drv_soft_i2c_diag_clear(void)
+{
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_IDLE, 0U, 0U, 0U, 0U, 0U);
+}
+
+drv_soft_i2c_diag_t drv_soft_i2c_diag_get(void)
+{
+    drv_soft_i2c_diag_t diag;
+
+    diag.stage = g_drv_soft_i2c_diag.stage;
+    diag.ack_bit = g_drv_soft_i2c_diag.ack_bit;
+    diag.device_addr7 = g_drv_soft_i2c_diag.device_addr7;
+    diag.reg_addr = g_drv_soft_i2c_diag.reg_addr;
+    diag.index = g_drv_soft_i2c_diag.index;
+    diag.length = g_drv_soft_i2c_diag.length;
+
+    return diag;
+}
+
 static uint16_t drv_soft_i2c_get_delay_us(const drv_soft_i2c_bus_t *bus)
 {
     if ((bus == NULL) || (bus->bit_delay_us == 0U))
@@ -80,6 +111,7 @@ static HAL_StatusTypeDef drv_soft_i2c_send_address(drv_soft_i2c_bus_t *bus, uint
     }
 
     status = drv_soft_i2c_read_ack(bus, &ack_bit);
+    g_drv_soft_i2c_diag.ack_bit = ack_bit;
     if ((status != HAL_OK) || (ack_bit != 0U))
     {
         return HAL_ERROR;
@@ -335,37 +367,44 @@ HAL_StatusTypeDef drv_soft_i2c_read_mem(drv_soft_i2c_bus_t *bus, uint8_t device_
         return HAL_ERROR;
     }
 
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_START_WRITE, 0U, device_addr7, reg_addr, 0U, length);
     status = drv_soft_i2c_start(bus);
     if (status != HAL_OK)
     {
         return status;
     }
 
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_WRITE, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, 0U, length);
     status = drv_soft_i2c_send_address(bus, device_addr7, 0U);
     if (status != HAL_OK)
     {
         goto exit_with_stop;
     }
 
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_REG, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, 0U, length);
     status = drv_soft_i2c_write_byte_raw(bus, reg_addr);
     if (status != HAL_OK)
     {
         goto exit_with_stop;
     }
 
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_REG_ACK, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, 0U, length);
     status = drv_soft_i2c_read_ack(bus, &ack_bit);
+    g_drv_soft_i2c_diag.ack_bit = ack_bit;
     if ((status != HAL_OK) || (ack_bit != 0U))
     {
         status = HAL_ERROR;
         goto exit_with_stop;
     }
 
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_START_READ, ack_bit, device_addr7, reg_addr, 0U, length);
     status = drv_soft_i2c_start(bus);
     if (status != HAL_OK)
     {
         goto exit_with_stop;
     }
 
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ, ack_bit, device_addr7, reg_addr, 0U, length);
     status = drv_soft_i2c_send_address(bus, device_addr7, 1U);
     if (status != HAL_OK)
     {
@@ -374,12 +413,14 @@ HAL_StatusTypeDef drv_soft_i2c_read_mem(drv_soft_i2c_bus_t *bus, uint8_t device_
 
     for (index = 0U; index < length; index++)
     {
+        drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_DATA, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, index, length);
         status = drv_soft_i2c_read_byte_raw(bus, &data[index]);
         if (status != HAL_OK)
         {
             goto exit_with_stop;
         }
 
+        drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_DATA_ACK, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, index, length);
         status = drv_soft_i2c_write_ack(bus, (index == (length - 1U)) ? 1U : 0U);
         if (status != HAL_OK)
         {
@@ -390,6 +431,11 @@ HAL_StatusTypeDef drv_soft_i2c_read_mem(drv_soft_i2c_bus_t *bus, uint8_t device_
     status = HAL_OK;
 
 exit_with_stop:
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_STOP, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, g_drv_soft_i2c_diag.index, length);
     (void)drv_soft_i2c_stop(bus);
+    if (status == HAL_OK)
+    {
+        drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_DONE, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, length, length);
+    }
     return status;
 }

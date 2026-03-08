@@ -117,6 +117,8 @@ static void App_Mpu6050ResetCalibrationContext(void);
 static void App_Mpu6050FinalizeCalibration(void);
 static void App_Mpu6050Task(void);
 static void App_Mpu6050ReportRaw(void);
+static const char *App_SoftI2cDiagStageText(uint8_t stage);
+static void App_ReportSoftI2cDiag(const char *prefix);
 static void App_DelayUsInit(void);
 static void App_DelayUs(uint32_t delay_us);
 static void App_DriversInit(void);
@@ -247,6 +249,52 @@ static void App_UartSendFormat(const char *format, ...)
   }
 
   (void)HAL_UART_Transmit(&huart1, (uint8_t *)buffer, (uint16_t)len, 100U);
+}
+
+static const char *App_SoftI2cDiagStageText(uint8_t stage)
+{
+  switch ((drv_soft_i2c_diag_stage_t)stage)
+  {
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_START_WRITE:
+      return "RD_ST1";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_WRITE:
+      return "RD_AW";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_REG:
+      return "RD_REG";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_REG_ACK:
+      return "RD_RACK";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_START_READ:
+      return "RD_ST2";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ:
+      return "RD_AR";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_DATA:
+      return "RD_DATA";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_DATA_ACK:
+      return "RD_WACK";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_STOP:
+      return "RD_STOP";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_DONE:
+      return "RD_DONE";
+    case DRV_SOFT_I2C_DIAG_STAGE_IDLE:
+    default:
+      return "IDLE";
+  }
+}
+
+static void App_ReportSoftI2cDiag(const char *prefix)
+{
+  drv_soft_i2c_diag_t diag;
+
+  diag = drv_soft_i2c_diag_get();
+  App_UartSendFormat("%s,DIAG=%s(%u),ACK=%u,IDX=%u,LEN=%u,REG=0x%02X,ADDR=0x%02X\r\n",
+                    (prefix != NULL) ? prefix : "I2C",
+                    App_SoftI2cDiagStageText(diag.stage),
+                    diag.stage,
+                    diag.ack_bit,
+                    diag.index,
+                    diag.length,
+                    diag.reg_addr,
+                    diag.device_addr7);
 }
 
 static void App_ReportResetFlags(void)
@@ -382,6 +430,7 @@ static void App_Mpu6050Task(void)
       if (dev_mpu6050_read_who_am_i(&g_mpu6050, &who_am_i) != HAL_OK)
       {
         App_UartSendText("MPU,WHOAMI=READ_ERR\r\n");
+        App_ReportSoftI2cDiag("MPU,WHOAMI");
         return;
       }
 
@@ -402,6 +451,7 @@ static void App_Mpu6050Task(void)
       if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
       {
         App_UartSendText("MPU,CAL,RAW_TEST=ERR\r\n");
+        App_ReportSoftI2cDiag("MPU,CAL");
         g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
         g_mpu_retry_last_ms = now_ms;
         return;
@@ -421,6 +471,7 @@ static void App_Mpu6050Task(void)
       if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
       {
         App_UartSendFormat("MPU,CAL,READ_ERR,IDX=%lu\r\n", (unsigned long)g_mpu_cal_sample_index);
+        App_ReportSoftI2cDiag("MPU,CAL");
         App_Mpu6050ResetCalibrationContext();
         g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
         g_mpu_retry_last_ms = now_ms;
@@ -463,6 +514,7 @@ static void App_Mpu6050ReportRaw(void)
   if (dev_mpu6050_read_raw(&g_mpu6050, &raw_data) != HAL_OK)
   {
     App_UartSendText("MPU,READ=ERR\r\n");
+    App_ReportSoftI2cDiag("MPU,READ");
     App_Mpu6050ResetCalibrationContext();
     g_mpu_state = APP_IMU_STATE_RETRY_WAIT;
     g_mpu_retry_last_ms = HAL_GetTick();

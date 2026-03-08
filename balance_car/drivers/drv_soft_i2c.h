@@ -17,6 +17,34 @@ typedef struct
     drv_soft_i2c_delay_us_fn_t delay_us;
 } drv_soft_i2c_bus_t;
 
+typedef enum
+{
+    DRV_SOFT_I2C_DIAG_STAGE_IDLE = 0U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_START_WRITE = 1U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_WRITE = 2U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_REG = 3U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_REG_ACK = 4U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_START_READ = 5U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ = 6U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_DATA = 7U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_DATA_ACK = 8U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_STOP = 9U,
+    DRV_SOFT_I2C_DIAG_STAGE_READ_DONE = 10U
+} drv_soft_i2c_diag_stage_t;
+
+typedef struct
+{
+    uint8_t stage;
+    uint8_t ack_bit;
+    uint8_t device_addr7;
+    uint8_t reg_addr;
+    uint16_t index;
+    uint16_t length;
+} drv_soft_i2c_diag_t;
+
+void drv_soft_i2c_diag_clear(void);
+drv_soft_i2c_diag_t drv_soft_i2c_diag_get(void);
+
 HAL_StatusTypeDef drv_soft_i2c_init(drv_soft_i2c_bus_t *bus);
 HAL_StatusTypeDef drv_soft_i2c_bus_recover(drv_soft_i2c_bus_t *bus);
 HAL_StatusTypeDef drv_soft_i2c_start(drv_soft_i2c_bus_t *bus);
