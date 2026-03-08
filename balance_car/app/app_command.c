@@ -1,8 +1,40 @@
 ﻿#include "app_command.h"
 
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+
+#define APP_COMMAND_RX_PROBE_ENABLE 1U
+
+static void app_command_probe_rx_byte(UART_HandleTypeDef *huart, uint8_t rx_byte)
+{
+    char buffer[40];
+    int length;
+    char text_char;
+
+#if APP_COMMAND_RX_PROBE_ENABLE == 0U
+    (void)huart;
+    (void)rx_byte;
+#else
+    if (huart == NULL)
+    {
+        return;
+    }
+
+    text_char = ((rx_byte >= 32U) && (rx_byte <= 126U)) ? (char)rx_byte : '.';
+    length = snprintf(buffer, sizeof(buffer), "RX,BYTE=0x%02X,CHAR=%c\r\n", rx_byte, text_char);
+    if (length > 0)
+    {
+        if (length >= (int)sizeof(buffer))
+        {
+            length = (int)sizeof(buffer) - 1;
+        }
+        (void)HAL_UART_Transmit(huart, (uint8_t *)buffer, (uint16_t)length, 100U);
+    }
+#endif
+}
 
 const app_command_config_t g_app_command_default_config =
 {
@@ -249,6 +281,8 @@ HAL_StatusTypeDef app_command_poll(app_command_t *command,
         {
             return HAL_OK;
         }
+
+        app_command_probe_rx_byte(huart, rx_byte);
 
         if ((rx_byte == '\r') || (rx_byte == '\n'))
         {
