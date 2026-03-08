@@ -24,3 +24,5 @@
 - Add a build-time switch in `main.c` to choose DWT or NOP-based microsecond delay.
 - Set the current test build to `NOP` delay to compare soft I2C stability against the previous DWT version.
 - Keep `bit_delay_us` unchanged so the only meaningful variable in this A/B step is the delay implementation.
+- Measured result on this board: `48` is stable but too slow (`CAL=OK` about 23.6s), `8` is stable (`CAL=OK` about 6.6s), `6` is also stable and faster (`CAL=OK` about 5.9s).
+- Current recommended bringup value is `APP_DELAY_US_NOP_INNER_LOOP = 6U`.

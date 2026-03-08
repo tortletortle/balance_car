@@ -62,7 +62,7 @@ typedef enum
 #define APP_MPU6050_STARTUP_SETTLE_MS       500U
 #define APP_IMU_BRINGUP_ONLY                1U
 #define APP_DELAY_US_USE_DWT                0U
-#define APP_DELAY_US_NOP_INNER_LOOP        48U
+#define APP_DELAY_US_NOP_INNER_LOOP        6U
 
 /* USER CODE END PD */
 
