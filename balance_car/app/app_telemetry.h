@@ -1,9 +1,10 @@
-﻿#ifndef APP_TELEMETRY_H
+#ifndef APP_TELEMETRY_H
 #define APP_TELEMETRY_H
 
 #include <stdint.h>
 
 #include "stm32f1xx_hal.h"
+#include "drv_uart.h"
 #include "app_command.h"
 #include "app_state_machine.h"
 #include "mod_imu.h"
@@ -15,10 +16,10 @@
 
 typedef struct
 {
-    UART_HandleTypeDef *huart;
+    drv_uart_t *uart;
 } app_telemetry_t;
 
-HAL_StatusTypeDef app_telemetry_init(app_telemetry_t *telemetry, UART_HandleTypeDef *huart);
+HAL_StatusTypeDef app_telemetry_init(app_telemetry_t *telemetry, drv_uart_t *uart);
 void app_telemetry_send_text(app_telemetry_t *telemetry, const char *text);
 void app_telemetry_send_format(app_telemetry_t *telemetry, const char *format, ...);
 void app_telemetry_send_boot(app_telemetry_t *telemetry);

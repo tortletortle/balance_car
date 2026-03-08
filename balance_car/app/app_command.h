@@ -1,4 +1,4 @@
-﻿#ifndef APP_COMMAND_H
+#ifndef APP_COMMAND_H
 #define APP_COMMAND_H
 
 #include <stdint.h>
@@ -44,8 +44,6 @@ extern const app_command_config_t g_app_command_default_config;
 HAL_StatusTypeDef app_command_init(app_command_t *command, const app_command_config_t *config);
 void app_command_reset(app_command_t *command);
 void app_command_feed_byte(app_command_t *command, uint8_t rx_byte);
-HAL_StatusTypeDef app_command_poll(app_command_t *command,
-                                   UART_HandleTypeDef *huart,
-                                   app_command_result_t *result);
+HAL_StatusTypeDef app_command_poll(app_command_t *command, app_command_result_t *result);
 
 #endif

@@ -26,8 +26,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <string.h>
 #include "app.h"
+#include "board.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -37,10 +37,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define APP_DELAY_US_USE_DWT        0U
-#define APP_DELAY_US_NOP_INNER_LOOP 6U
-#define APP_IMU_I2C_BIT_DELAY_US    20U
-#define APP_MOTOR_OUTPUT_ENABLE     0U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -57,50 +53,10 @@ static app_t g_app;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-static void App_DelayUsInit(void);
-static void App_DelayUs(uint32_t delay_us);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void App_DelayUsInit(void)
-{
-#if APP_DELAY_US_USE_DWT == 1U
-  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-  DWT->CYCCNT = 0U;
-#endif
-}
-
-static void App_DelayUs(uint32_t delay_us)
-{
-#if APP_DELAY_US_USE_DWT == 1U
-  uint32_t start_cycle;
-  uint32_t wait_cycles;
-
-  if (delay_us == 0U)
-  {
-    return;
-  }
-
-  start_cycle = DWT->CYCCNT;
-  wait_cycles = (SystemCoreClock / 1000000U) * delay_us;
-  while ((DWT->CYCCNT - start_cycle) < wait_cycles)
-  {
-  }
-#else
-  volatile uint32_t outer_count;
-  volatile uint32_t inner_count;
-
-  for (outer_count = 0U; outer_count < delay_us; outer_count++)
-  {
-    for (inner_count = 0U; inner_count < APP_DELAY_US_NOP_INNER_LOOP; inner_count++)
-    {
-      __NOP();
-    }
-  }
-#endif
-}
 /* USER CODE END 0 */
 
 /**
@@ -143,28 +99,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   app_config_t app_config;
 
-  App_DelayUsInit();
-  memset(&app_config, 0, sizeof(app_config));
-  app_config.hw.hadc_battery = &hadc1;
-  app_config.hw.adc_battery_channel = ADC_CHANNEL_6;
-  app_config.hw.htim_encoder_a = &htim2;
-  app_config.hw.encoder_a_direction = 1;
-  app_config.hw.htim_encoder_b = &htim4;
-  app_config.hw.encoder_b_direction = 1;
-  app_config.hw.htim_pwm = &htim3;
-  app_config.hw.pwm_channel_motor_a = TIM_CHANNEL_4;
-  app_config.hw.pwm_channel_motor_b = TIM_CHANNEL_3;
-  app_config.hw.huart_debug = &huart1;
-  app_config.hw.imu_scl_port = IMU_SCL_GPIO_Port;
-  app_config.hw.imu_scl_pin = IMU_SCL_Pin;
-  app_config.hw.imu_sda_port = IMU_SDA_GPIO_Port;
-  app_config.hw.imu_sda_pin = IMU_SDA_Pin;
-  app_config.hw.estop_port = ESTOP_GPIO_Port;
-  app_config.hw.estop_pin = ESTOP_Pin;
-  app_config.hw.estop_active_low = 1U;
-  app_config.hw.motor_output_enable = APP_MOTOR_OUTPUT_ENABLE;
-  app_config.hw.imu_i2c_bit_delay_us = APP_IMU_I2C_BIT_DELAY_US;
-  app_config.hw.delay_us = App_DelayUs;
+  if (board_build_hw_config(&app_config.hw) != HAL_OK)
+  {
+    Error_Handler();
+  }
   app_config.logic = g_app_default_logic_config;
 
   if (app_init(&g_app, &app_config, HAL_GetTick()) != HAL_OK)

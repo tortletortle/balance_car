@@ -263,12 +263,9 @@ void app_command_feed_byte(app_command_t *command, uint8_t rx_byte)
 }
 
 HAL_StatusTypeDef app_command_poll(app_command_t *command,
-                                   UART_HandleTypeDef *huart,
                                    app_command_result_t *result)
 {
     uint8_t rx_byte;
-
-    (void)huart;
 
     if ((command == NULL) || (result == NULL) || (command->initialized == 0U))
     {

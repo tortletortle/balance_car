@@ -78,23 +78,12 @@ const app_logic_config_t g_app_default_logic_config =
 
 static HAL_StatusTypeDef app_uart_start_receive_it(app_t *app)
 {
-    if ((app == NULL) || (app->config.hw.huart_debug == NULL))
+    if (app == NULL)
     {
         return HAL_ERROR;
     }
 
-    if (HAL_UART_Receive_IT(app->config.hw.huart_debug, &app->uart_rx_it_byte, 1U) == HAL_OK)
-    {
-        return HAL_OK;
-    }
-
-    (void)HAL_UART_AbortReceive(app->config.hw.huart_debug);
-    if (HAL_UART_Receive_IT(app->config.hw.huart_debug, &app->uart_rx_it_byte, 1U) != HAL_OK)
-    {
-        return HAL_ERROR;
-    }
-
-    return HAL_OK;
+    return drv_uart_start_receive_byte_it(&app->debug_uart, &app->uart_rx_it_byte);
 }
 
 static uint8_t app_is_estop_active(const app_t *app)
@@ -131,6 +120,11 @@ static HAL_StatusTypeDef app_init_drivers(app_t *app)
 {
     if ((app == NULL) || (app->config.hw.delay_us == NULL) ||
         (app->config.hw.huart_debug == NULL) || (app->config.hw.htim_pwm == NULL))
+    {
+        return HAL_ERROR;
+    }
+
+    if (drv_uart_init(&app->debug_uart, app->config.hw.huart_debug) != HAL_OK)
     {
         return HAL_ERROR;
     }
@@ -279,7 +273,7 @@ static HAL_StatusTypeDef app_init_modules(app_t *app)
         return HAL_ERROR;
     }
 
-    if (app_telemetry_init(&app->telemetry, app->config.hw.huart_debug) != HAL_OK)
+    if (app_telemetry_init(&app->telemetry, &app->debug_uart) != HAL_OK)
     {
         return HAL_ERROR;
     }
@@ -534,7 +528,7 @@ HAL_StatusTypeDef app_task(app_t *app, uint32_t now_ms)
 
     clear_request = 0U;
     force_status = 0U;
-    if (app_command_poll(&app->command, app->config.hw.huart_debug, &command_result) != HAL_OK)
+    if (app_command_poll(&app->command, &command_result) != HAL_OK)
     {
         return HAL_ERROR;
     }
@@ -603,12 +597,12 @@ HAL_StatusTypeDef app_task(app_t *app, uint32_t now_ms)
 
 HAL_StatusTypeDef app_on_uart_rx_cplt(app_t *app, UART_HandleTypeDef *huart)
 {
-    if ((app == NULL) || (huart == NULL) || (app->config.hw.huart_debug == NULL))
+    if ((app == NULL) || (huart == NULL))
     {
         return HAL_ERROR;
     }
 
-    if (huart != app->config.hw.huart_debug)
+    if (drv_uart_matches_handle(&app->debug_uart, huart) == 0U)
     {
         return HAL_OK;
     }
@@ -619,16 +613,16 @@ HAL_StatusTypeDef app_on_uart_rx_cplt(app_t *app, UART_HandleTypeDef *huart)
 
 HAL_StatusTypeDef app_on_uart_error(app_t *app, UART_HandleTypeDef *huart)
 {
-    if ((app == NULL) || (huart == NULL) || (app->config.hw.huart_debug == NULL))
+    if ((app == NULL) || (huart == NULL))
     {
         return HAL_ERROR;
     }
 
-    if (huart != app->config.hw.huart_debug)
+    if (drv_uart_matches_handle(&app->debug_uart, huart) == 0U)
     {
         return HAL_OK;
     }
 
-    __HAL_UART_CLEAR_OREFLAG(huart);
+    drv_uart_clear_overrun(&app->debug_uart);
     return app_uart_start_receive_it(app);
 }

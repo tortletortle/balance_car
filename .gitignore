@@ -1,0 +1,25 @@
+# IDE and local workspace
+.metadata/
+.vscode/
+
+# Current project local state
+balance_car/.metadata/
+balance_car/.codex/
+balance_car/tmp/
+balance_car/Two_balance_car/STM32CubeIDE/Debug/
+balance_car/Two_balance_car/STM32CubeIDE/workspace_headless/
+balance_car/Two_balance_car/STM32CubeIDE/.settings/language.settings.xml
+
+# Scratch images and converted notes
+_*.png
+schematic_converted.md
+
+# Local reference assets
+balance_v1/
+balance_v2/
+balance_v3/
+skills/
+text/
+# CubeIDE linked-resource mirrors
+balance_car/Two_balance_car/Inc/
+balance_car/Two_balance_car/Src/

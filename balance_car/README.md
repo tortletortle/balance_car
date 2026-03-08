@@ -1,29 +1,42 @@
-# balance_car
+﻿# balance_car
 
-当前仓库已完成整理阶段，现进入“按分层架构重写平衡小车”的驱动层开发阶段。
+这是当前平衡小车重构工程的主项目目录。
 
-## 当前阶段目标
+## 当前目标
 
-- 固定板级硬件事实、工具链和工程边界
-- 按 `board -> drivers -> devices -> modules -> control -> app` 分层推进重写
-- 先完成可讲解、可维护的基础驱动，再进入器件、模块和控制层
-- 每完成一块，先更新文档，再提交 Git
+- 按 `board -> drivers -> devices -> modules -> control -> app -> docs` 分层重写工程
+- 先把结构、接口和调试链路写清楚，再进入整车闭环调参
+- 每完成一块都同步更新文档、提交 Git，并保持改动可解释、可维护
 
-## 参考项目
+## 当前状态
+
+- `IMU -> attitude_estimator -> angle_loop -> VOFA/STATUS` 链路已打通
+- `USART1` 命令接收已改为 `RX 中断 + 环形缓冲`
+- `pwm -> tb6612 -> motor` 执行链已接入，但默认不打开实际电机输出
+- 速度环接口已补齐，但默认不开闭环
+- 正在继续收口 `board` 层、`drv_uart` 层和工程整理
+
+## 目录说明
+
+- `board`：板级资源装配、引脚 / 方向 / 句柄映射
+- `drivers`：MCU 外设驱动封装，如 `adc/pwm/encoder/soft_i2c/uart`
+- `devices`：具体器件驱动，如 `mpu6050`、`tb6612`
+- `modules`：整车功能模块，如 `imu`、`motor`、`battery_monitor`、`safety`
+- `control`：姿态估计、角度环、速度环
+- `app`：状态机、调度、命令协议、遥测输出
+- `docs`：架构说明、调试记录、变更记录
+- `Two_balance_car`：STM32CubeIDE 工程主体
+
+## 参考工程
 
 - 第一完成版参考工程：`D:\program\learning\balance_v3`
 
-该工程当前仅作为参考资产，不能直接视为新项目的实现基础。
+参考工程仅作为硬件映射、调试思路和控制语义参考，不直接照搬实现。
 
-## 当前文档
+## 关键文档
 
-- `docs/PROJECT_UNDERSTANDING.md`：对 `balance_v3` 的结构化理解
-- `docs/WORKFLOW.md`：当前阶段的工作方式、提交与记录规则
-- `docs/DECISIONS.md`：阶段性决策记录
-- `docs/CHANGELOG.md`：每次整理或实现动作的变更日志
-
-## 当前约束
-
-- 先整理，再设计，再开发
-- 每完成一块，先更新文档，再提交 Git
-- 提交保持小而清晰，禁止把无关旧资料一起纳入版本历史
+- `docs/PROJECT_UNDERSTANDING.md`
+- `docs/APP_INTEGRATION.md`
+- `docs/DECISIONS.md`
+- `docs/CHANGELOG.md`
+- `docs/WIRING_FROM_CODE.md`

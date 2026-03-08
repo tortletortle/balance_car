@@ -98,14 +98,14 @@ static void app_telemetry_send_cal_index(app_telemetry_t *telemetry, uint32_t sa
     app_telemetry_send_text(telemetry, text);
 }
 
-HAL_StatusTypeDef app_telemetry_init(app_telemetry_t *telemetry, UART_HandleTypeDef *huart)
+HAL_StatusTypeDef app_telemetry_init(app_telemetry_t *telemetry, drv_uart_t *uart)
 {
-    if ((telemetry == NULL) || (huart == NULL))
+    if ((telemetry == NULL) || (uart == NULL))
     {
         return HAL_ERROR;
     }
 
-    telemetry->huart = huart;
+    telemetry->uart = uart;
     return HAL_OK;
 }
 
@@ -113,7 +113,7 @@ void app_telemetry_send_text(app_telemetry_t *telemetry, const char *text)
 {
     uint16_t length;
 
-    if ((telemetry == NULL) || (telemetry->huart == NULL) || (text == NULL))
+    if ((telemetry == NULL) || (telemetry->uart == NULL) || (text == NULL))
     {
         return;
     }
@@ -126,7 +126,7 @@ void app_telemetry_send_text(app_telemetry_t *telemetry, const char *text)
 
     if (length > 0U)
     {
-        (void)HAL_UART_Transmit(telemetry->huart, (uint8_t *)text, length, 100U);
+        (void)drv_uart_transmit(telemetry->uart, (const uint8_t *)text, length, 100U);
     }
 }
 
@@ -136,7 +136,7 @@ void app_telemetry_send_format(app_telemetry_t *telemetry, const char *format, .
     int length;
     va_list args;
 
-    if ((telemetry == NULL) || (telemetry->huart == NULL) || (format == NULL))
+    if ((telemetry == NULL) || (telemetry->uart == NULL) || (format == NULL))
     {
         return;
     }
@@ -155,7 +155,7 @@ void app_telemetry_send_format(app_telemetry_t *telemetry, const char *format, .
         length = (int)sizeof(buffer) - 1;
     }
 
-    (void)HAL_UART_Transmit(telemetry->huart, (uint8_t *)buffer, (uint16_t)length, 100U);
+    (void)drv_uart_transmit(telemetry->uart, (const uint8_t *)buffer, (uint16_t)length, 100U);
 }
 
 void app_telemetry_send_boot(app_telemetry_t *telemetry)

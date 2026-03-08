@@ -347,5 +347,25 @@
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/app/app_telemetry.h</locationURI>
 		</link>
+		<link>
+			<name>Application/User/Drivers/drv_uart.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_uart.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_uart.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_uart.h</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Board/board.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/board/board.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Board/board.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/board/board.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>

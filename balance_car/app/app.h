@@ -1,13 +1,15 @@
-﻿#ifndef APP_H
+#ifndef APP_H
 #define APP_H
 
 #include <stdint.h>
 
 #include "stm32f1xx_hal.h"
+#include "board.h"
 #include "drv_adc.h"
 #include "drv_encoder.h"
 #include "drv_pwm.h"
 #include "drv_soft_i2c.h"
+#include "drv_uart.h"
 #include "dev_mpu6050.h"
 #include "dev_tb6612.h"
 #include "mod_imu.h"
@@ -21,30 +23,6 @@
 #include "app_state_machine.h"
 #include "app_command.h"
 #include "app_telemetry.h"
-
-typedef struct
-{
-    ADC_HandleTypeDef *hadc_battery;
-    uint32_t adc_battery_channel;
-    TIM_HandleTypeDef *htim_encoder_a;
-    int8_t encoder_a_direction;
-    TIM_HandleTypeDef *htim_encoder_b;
-    int8_t encoder_b_direction;
-    TIM_HandleTypeDef *htim_pwm;
-    uint32_t pwm_channel_motor_a;
-    uint32_t pwm_channel_motor_b;
-    UART_HandleTypeDef *huart_debug;
-    GPIO_TypeDef *imu_scl_port;
-    uint16_t imu_scl_pin;
-    GPIO_TypeDef *imu_sda_port;
-    uint16_t imu_sda_pin;
-    GPIO_TypeDef *estop_port;
-    uint16_t estop_pin;
-    uint8_t estop_active_low;
-    uint8_t motor_output_enable;
-    uint32_t imu_i2c_bit_delay_us;
-    void (*delay_us)(uint32_t delay_us);
-} app_hw_config_t;
 
 typedef struct
 {
@@ -63,7 +41,7 @@ typedef struct
 
 typedef struct
 {
-    app_hw_config_t hw;
+    board_hw_config_t hw;
     app_logic_config_t logic;
 } app_config_t;
 
@@ -75,6 +53,7 @@ typedef struct
     drv_encoder_t encoder_b;
     drv_pwm_t motor_pwm_a;
     drv_pwm_t motor_pwm_b;
+    drv_uart_t debug_uart;
     drv_soft_i2c_bus_t imu_soft_i2c_bus;
     dev_mpu6050_t mpu6050;
     dev_tb6612_t tb6612;
