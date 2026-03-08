@@ -34,6 +34,7 @@
 #include "drv_soft_i2c.h"
 #include "mod_imu.h"
 #include "ctrl_attitude_estimator.h"
+#include "ctrl_angle_loop.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,6 +47,7 @@
 #define APP_IMU_BRINGUP_ONLY                1U
 #define APP_DELAY_US_USE_DWT                0U
 #define APP_DELAY_US_NOP_INNER_LOOP         6U
+#define APP_ANGLE_LOOP_TARGET_PITCH_MDEG    0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -67,6 +69,7 @@ static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
 static dev_mpu6050_t g_mpu6050;
 static mod_imu_t g_imu_module;
 static ctrl_attitude_estimator_t g_attitude_estimator;
+static ctrl_angle_loop_t g_angle_loop;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -79,7 +82,9 @@ static void App_ImuSendCalIndex(uint32_t sample_index);
 static void App_ImuHandleEvent(mod_imu_event_t event);
 static void App_AttitudeEstimatorReset(void);
 static int App_FormatSignedMilli(char *buffer, uint32_t buffer_size, int32_t value);
-static void App_VofaSendAttitude(const ctrl_attitude_estimator_output_t *output);
+static void App_VofaSendAngleLoop(const ctrl_attitude_estimator_output_t *attitude_output,
+                                  int32_t target_pitch_mdeg,
+                                  const ctrl_angle_loop_output_t *angle_output);
 static void App_AttitudeEstimateAndReportVofa(void);
 static const char *App_SoftI2cDiagStageText(uint8_t stage);
 static void App_ReportSoftI2cDiag(const char *prefix);
@@ -325,6 +330,7 @@ static void App_ImuSendCalIndex(uint32_t sample_index)
 static void App_AttitudeEstimatorReset(void)
 {
   ctrl_attitude_estimator_reset(&g_attitude_estimator);
+  ctrl_angle_loop_reset(&g_angle_loop);
   g_attitude_report_last_ms = HAL_GetTick();
 }
 
@@ -355,39 +361,59 @@ static int App_FormatSignedMilli(char *buffer, uint32_t buffer_size, int32_t val
                   (unsigned long)(absolute_value % 1000U));
 }
 
-static void App_VofaSendAttitude(const ctrl_attitude_estimator_output_t *output)
+static void App_VofaSendAngleLoop(const ctrl_attitude_estimator_output_t *attitude_output,
+                                  int32_t target_pitch_mdeg,
+                                  const ctrl_angle_loop_output_t *angle_output)
 {
   char channel_1[20];
   char channel_2[20];
   char channel_3[20];
-  char channel_4[20];
+  char channel_4[16];
+  char channel_5[20];
+  char channel_6[20];
 
-  if (output == NULL)
+  if ((attitude_output == NULL) || (angle_output == NULL))
   {
     return;
   }
 
-  if (App_FormatSignedMilli(channel_1, sizeof(channel_1), output->pitch_accel_mdeg) <= 0)
+  if (App_FormatSignedMilli(channel_1, sizeof(channel_1), target_pitch_mdeg) <= 0)
   {
     return;
   }
 
-  if (App_FormatSignedMilli(channel_2, sizeof(channel_2), output->pitch_gyro_mdeg) <= 0)
+  if (App_FormatSignedMilli(channel_2, sizeof(channel_2), attitude_output->pitch_fused_mdeg) <= 0)
   {
     return;
   }
 
-  if (App_FormatSignedMilli(channel_3, sizeof(channel_3), output->pitch_fused_mdeg) <= 0)
+  if (App_FormatSignedMilli(channel_3, sizeof(channel_3), angle_output->pitch_error_mdeg) <= 0)
   {
     return;
   }
 
-  if (App_FormatSignedMilli(channel_4, sizeof(channel_4), output->pitch_rate_mdps) <= 0)
+  if (snprintf(channel_4, sizeof(channel_4), "%d", (int)angle_output->angle_cmd) <= 0)
   {
     return;
   }
 
-  App_UartSendFormat("%s,%s,%s,%s\r\n", channel_1, channel_2, channel_3, channel_4);
+  if (App_FormatSignedMilli(channel_5, sizeof(channel_5), attitude_output->pitch_rate_mdps) <= 0)
+  {
+    return;
+  }
+
+  if (App_FormatSignedMilli(channel_6, sizeof(channel_6), angle_output->d_input_filt_ddeg * 100) <= 0)
+  {
+    return;
+  }
+
+  App_UartSendFormat("%s,%s,%s,%s,%s,%s\r\n",
+                     channel_1,
+                     channel_2,
+                     channel_3,
+                     channel_4,
+                     channel_5,
+                     channel_6);
 }
 
 static void App_ImuHandleEvent(mod_imu_event_t event)
@@ -470,6 +496,8 @@ static void App_AttitudeEstimateAndReportVofa(void)
   mod_imu_report_t imu_report;
   ctrl_attitude_estimator_input_t estimator_input;
   ctrl_attitude_estimator_output_t estimator_output;
+  ctrl_angle_loop_input_t angle_input;
+  ctrl_angle_loop_output_t angle_output;
   uint32_t now_ms;
 
   now_ms = HAL_GetTick();
@@ -498,7 +526,16 @@ static void App_AttitudeEstimateAndReportVofa(void)
     return;
   }
 
-  App_VofaSendAttitude(&estimator_output);
+  angle_input.target_pitch_mdeg = APP_ANGLE_LOOP_TARGET_PITCH_MDEG;
+  angle_input.pitch_mdeg = estimator_output.pitch_fused_mdeg;
+  angle_input.pitch_rate_mdps = estimator_output.pitch_rate_mdps;
+  if (ctrl_angle_loop_update(&g_angle_loop, &angle_input, &angle_output) != HAL_OK)
+  {
+    App_AttitudeEstimatorReset();
+    return;
+  }
+
+  App_VofaSendAngleLoop(&estimator_output, angle_input.target_pitch_mdeg, &angle_output);
 }
 /* USER CODE END 0 */
 
@@ -553,6 +590,21 @@ int main(void)
                                    &g_ctrl_attitude_estimator_default_config) != HAL_OK)
   {
     Error_Handler();
+  }
+
+  {
+    ctrl_angle_loop_config_t angle_loop_config;
+
+    angle_loop_config = g_ctrl_angle_loop_default_config;
+    if (g_imu_module.config.report_interval_ms > 0U)
+    {
+      angle_loop_config.loop_period_ms = g_imu_module.config.report_interval_ms;
+    }
+
+    if (ctrl_angle_loop_init(&g_angle_loop, &angle_loop_config) != HAL_OK)
+    {
+      Error_Handler();
+    }
   }
 
   mod_imu_reset(&g_imu_module, HAL_GetTick());
