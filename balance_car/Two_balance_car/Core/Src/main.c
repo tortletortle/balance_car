@@ -31,8 +31,11 @@
 #include <stdint.h>
 #include "drv_adc.h"
 #include "drv_encoder.h"
+#include "drv_pwm.h"
 #include "drv_soft_i2c.h"
+#include "dev_tb6612.h"
 #include "mod_imu.h"
+#include "mod_motor.h"
 #include "ctrl_attitude_estimator.h"
 #include "ctrl_angle_loop.h"
 /* USER CODE END Includes */
@@ -48,6 +51,7 @@
 #define APP_DELAY_US_USE_DWT                0U
 #define APP_DELAY_US_NOP_INNER_LOOP         6U
 #define APP_ANGLE_LOOP_TARGET_PITCH_MDEG    0
+#define APP_MOTOR_OUTPUT_ENABLE             0U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,9 +69,13 @@ static drv_adc_t g_battery_adc;
 static drv_encoder_t g_encoder_tim2;
 static drv_encoder_t g_encoder_tim4;
 #endif
+static drv_pwm_t g_motor_pwm_motor_a;
+static drv_pwm_t g_motor_pwm_motor_b;
 static drv_soft_i2c_bus_t g_imu_soft_i2c_bus;
 static dev_mpu6050_t g_mpu6050;
+static dev_tb6612_t g_tb6612;
 static mod_imu_t g_imu_module;
+static mod_motor_t g_motor_module;
 static ctrl_attitude_estimator_t g_attitude_estimator;
 static ctrl_angle_loop_t g_angle_loop;
 /* USER CODE END PV */
@@ -86,6 +94,8 @@ static void App_VofaSendAngleLoop(const ctrl_attitude_estimator_output_t *attitu
                                   int32_t target_pitch_mdeg,
                                   const ctrl_angle_loop_output_t *angle_output);
 static void App_AttitudeEstimateAndReportVofa(void);
+static uint8_t App_IsEstopActive(void);
+static void App_MotorApplyAngleCommand(int16_t angle_cmd);
 static const char *App_SoftI2cDiagStageText(uint8_t stage);
 static void App_ReportSoftI2cDiag(const char *prefix);
 static void App_DelayUsInit(void);
@@ -146,6 +156,34 @@ static void App_DriversInit(void)
   g_imu_soft_i2c_bus.bit_delay_us = 20U;
   g_imu_soft_i2c_bus.delay_us = App_DelayUs;
 
+  if (drv_pwm_init(&g_motor_pwm_motor_a, &htim3, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (drv_pwm_init(&g_motor_pwm_motor_b, &htim3, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (dev_tb6612_init(&g_tb6612,
+                      &g_motor_pwm_motor_a,
+                      &g_motor_pwm_motor_b,
+                      &g_dev_tb6612_default_config) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (dev_tb6612_start(&g_tb6612) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (mod_motor_init(&g_motor_module, &g_tb6612, &g_mod_motor_default_config) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
 #if APP_IMU_BRINGUP_ONLY == 0U
   if (drv_encoder_init(&g_encoder_tim2, &htim2, 1) != HAL_OK)
   {
@@ -179,6 +217,24 @@ static void App_DriversInit(void)
   }
 
   if (dev_mpu6050_bind(&g_mpu6050, &g_imu_soft_i2c_bus, DEV_MPU6050_DEFAULT_ADDRESS_7BIT) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+static uint8_t App_IsEstopActive(void)
+{
+  return (HAL_GPIO_ReadPin(ESTOP_GPIO_Port, ESTOP_Pin) == GPIO_PIN_RESET) ? 1U : 0U;
+}
+
+static void App_MotorApplyAngleCommand(int16_t angle_cmd)
+{
+  uint8_t motor_output_enable;
+
+  mod_motor_set_common_target(&g_motor_module, angle_cmd);
+  motor_output_enable = (APP_MOTOR_OUTPUT_ENABLE != 0U) && (App_IsEstopActive() == 0U);
+  mod_motor_set_enable(&g_motor_module, motor_output_enable);
+  if (mod_motor_update(&g_motor_module, NULL) != HAL_OK)
   {
     Error_Handler();
   }
@@ -331,6 +387,7 @@ static void App_AttitudeEstimatorReset(void)
 {
   ctrl_attitude_estimator_reset(&g_attitude_estimator);
   ctrl_angle_loop_reset(&g_angle_loop);
+  mod_motor_reset(&g_motor_module);
   g_attitude_report_last_ms = HAL_GetTick();
 }
 
@@ -535,6 +592,7 @@ static void App_AttitudeEstimateAndReportVofa(void)
     return;
   }
 
+  App_MotorApplyAngleCommand(angle_output.angle_cmd);
   App_VofaSendAngleLoop(&estimator_output, angle_input.target_pitch_mdeg, &angle_output);
 }
 /* USER CODE END 0 */
@@ -580,6 +638,9 @@ int main(void)
   App_DriversInit();
   App_UartSendText("BOOT,USART1=OK\r\n");
   App_ReportResetFlags();
+  App_UartSendFormat("MOTOR,CHAIN=OK,EXEC=%u,ESTOP=%u\r\n",
+                     (unsigned int)APP_MOTOR_OUTPUT_ENABLE,
+                     (unsigned int)App_IsEstopActive());
 
   if (mod_imu_init(&g_imu_module, &g_mpu6050, &g_mod_imu_default_config) != HAL_OK)
   {

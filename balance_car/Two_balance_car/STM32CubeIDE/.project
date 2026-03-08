@@ -236,5 +236,35 @@
 			<type>1</type>
 			<locationURI>PARENT-2-PROJECT_LOC/control/ctrl_angle_loop.h</locationURI>
 		</link>
+		<link>
+			<name>Application/User/Drivers/drv_pwm.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_pwm.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Drivers/drv_pwm.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/drivers/drv_pwm.h</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Devices/dev_tb6612.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/devices/dev_tb6612.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Devices/dev_tb6612.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/devices/dev_tb6612.h</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Modules/mod_motor.c</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/modules/mod_motor.c</locationURI>
+		</link>
+		<link>
+			<name>Application/User/Modules/mod_motor.h</name>
+			<type>1</type>
+			<locationURI>PARENT-2-PROJECT_LOC/modules/mod_motor.h</locationURI>
+		</link>
 	</linkedResources>
 </projectDescription>
