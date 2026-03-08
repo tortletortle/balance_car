@@ -13,3 +13,8 @@
 - Capture last read stage, ACK bit, register address, device address, byte index, and total length.
 - Print the diagnostic snapshot from `main.c` when `WHO_AM_I`, raw-test, or runtime MPU reads fail.
 - Goal: distinguish whether the failure is at write-address ACK, register ACK, repeated-start, read-address ACK, or data phase.
+
+## 2026-03-08 - Read-address split diagnostics
+
+- Split the repeated-start read-address phase into `RD_ARS` (address byte send) and `RD_ARA` (address ACK).
+- Keep other diagnostic stages unchanged so the next halt snapshot can distinguish bit-send vs ACK wait.

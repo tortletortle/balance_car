@@ -265,8 +265,10 @@ static const char *App_SoftI2cDiagStageText(uint8_t stage)
       return "RD_RACK";
     case DRV_SOFT_I2C_DIAG_STAGE_READ_START_READ:
       return "RD_ST2";
-    case DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ:
-      return "RD_AR";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ_SEND:
+      return "RD_ARS";
+    case DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ_ACK:
+      return "RD_ARA";
     case DRV_SOFT_I2C_DIAG_STAGE_READ_DATA:
       return "RD_DATA";
     case DRV_SOFT_I2C_DIAG_STAGE_READ_DATA_ACK:

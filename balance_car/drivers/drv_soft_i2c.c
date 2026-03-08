@@ -404,10 +404,19 @@ HAL_StatusTypeDef drv_soft_i2c_read_mem(drv_soft_i2c_bus_t *bus, uint8_t device_
         goto exit_with_stop;
     }
 
-    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ, ack_bit, device_addr7, reg_addr, 0U, length);
-    status = drv_soft_i2c_send_address(bus, device_addr7, 1U);
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ_SEND, ack_bit, device_addr7, reg_addr, 0U, length);
+    status = drv_soft_i2c_write_byte_raw(bus, (uint8_t)((device_addr7 << 1) | 0x01U));
     if (status != HAL_OK)
     {
+        goto exit_with_stop;
+    }
+
+    drv_soft_i2c_diag_update(DRV_SOFT_I2C_DIAG_STAGE_READ_ADDR_READ_ACK, g_drv_soft_i2c_diag.ack_bit, device_addr7, reg_addr, 0U, length);
+    status = drv_soft_i2c_read_ack(bus, &ack_bit);
+    g_drv_soft_i2c_diag.ack_bit = ack_bit;
+    if ((status != HAL_OK) || (ack_bit != 0U))
+    {
+        status = HAL_ERROR;
         goto exit_with_stop;
     }
 
