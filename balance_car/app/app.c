@@ -195,6 +195,67 @@ static void app_reset_control_chain(app_t *app, uint32_t now_ms)
     memset(&app->last_speed_output, 0, sizeof(app->last_speed_output));
 }
 
+static void app_apply_angle_loop_tuning(app_t *app,
+                                        const app_command_result_t *command_result,
+                                        uint8_t *force_status)
+{
+    uint8_t angle_config_changed;
+
+    if ((app == NULL) || (command_result == NULL))
+    {
+        return;
+    }
+
+    angle_config_changed = 0U;
+
+    if (command_result->angle_kp_valid != 0U)
+    {
+        app->config.logic.angle_loop_config.kp_q8 = command_result->angle_kp_q8;
+        app->angle_loop.config.kp_q8 = command_result->angle_kp_q8;
+        angle_config_changed = 1U;
+    }
+
+    if (command_result->angle_ki_valid != 0U)
+    {
+        app->config.logic.angle_loop_config.ki_q8 = command_result->angle_ki_q8;
+        app->angle_loop.config.ki_q8 = command_result->angle_ki_q8;
+        app->angle_loop.i_accum = 0;
+        app->angle_loop.last_output.i_accum = 0;
+        angle_config_changed = 1U;
+    }
+
+    if (command_result->angle_kd_valid != 0U)
+    {
+        app->config.logic.angle_loop_config.kd_q8 = command_result->angle_kd_q8;
+        app->angle_loop.config.kd_q8 = command_result->angle_kd_q8;
+        angle_config_changed = 1U;
+    }
+
+    if (command_result->angle_cmd_limit_valid != 0U)
+    {
+        app->config.logic.angle_loop_config.cmd_limit = command_result->angle_cmd_limit;
+        app->angle_loop.config.cmd_limit = command_result->angle_cmd_limit;
+        angle_config_changed = 1U;
+    }
+
+    if (command_result->angle_deadband_valid != 0U)
+    {
+        app->config.logic.angle_loop_config.error_deadband_ddeg = command_result->angle_error_deadband_ddeg;
+        app->angle_loop.config.error_deadband_ddeg = command_result->angle_error_deadband_ddeg;
+        angle_config_changed = 1U;
+    }
+
+    if ((command_result->angle_config_requested != 0U) || (angle_config_changed != 0U))
+    {
+        app_telemetry_send_angle_config(&app->telemetry, &app->angle_loop.config);
+    }
+
+    if ((force_status != NULL) && (angle_config_changed != 0U))
+    {
+        *force_status = 1U;
+    }
+}
+
 static HAL_StatusTypeDef app_init_drivers(app_t *app)
 {
     if ((app == NULL) || (app->config.hw.delay_us == NULL) ||
@@ -529,6 +590,8 @@ static void app_handle_command_result(app_t *app,
         app->vofa_enabled = command_result->vofa_enable;
     }
 
+    app_apply_angle_loop_tuning(app, command_result, force_status);
+
     if ((clear_request != NULL) && (command_result->clear_fault_requested != 0U))
     {
         *clear_request = 1U;
@@ -593,6 +656,7 @@ HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_
                               (unsigned int)app->config.logic.motor_profile.encoder_counts_per_rev,
                               (unsigned int)app->config.logic.motor_profile.gear_ratio_x100,
                               (unsigned int)app->config.logic.motor_profile.wheel_radius_mm);
+    app_telemetry_send_angle_config(&app->telemetry, &app->config.logic.angle_loop_config);
     return HAL_OK;
 }
 

@@ -410,6 +410,23 @@ mod_imu
 - `TARGET <mdeg>` / `T <mdeg>`
 - `VOFA ON`
 - `VOFA OFF`
+- `ANGLE` / `PID`
+- `ANGLE KP <q8>`
+- `ANGLE KI <q8>`
+- `ANGLE KD <q8>`
+- `ANGLE LIMIT <cmd>`
+- `ANGLE DEAD <ddeg>`
+
+其中：
+
+- `ANGLE` / `PID`：打印当前角度环配置
+- `ANGLE KP <q8>`：修改角度环比例增益，单位是 `Q8`
+- `ANGLE KI <q8>`：修改角度环积分增益，单位是 `Q8`
+- `ANGLE KD <q8>`：修改角度环微分增益，单位是 `Q8`
+- `ANGLE LIMIT <cmd>`：修改角度环输出限幅
+- `ANGLE DEAD <ddeg>`：修改角度误差死区，单位是 `0.1°`
+
+这里的 `Q8` 含义是：实际增益 = 串口写入值 / `256`。
 
 ### 8.2 `STATUS` 行怎么看
 
@@ -429,6 +446,20 @@ mod_imu
 - `ACMD`：角度环输出
 - `PWM`：速度环 / 电机链当前输出
 
+如果你要看当前角度环参数，不看 `STATUS`，直接发：
+
+- `ANGLE`
+
+当前会返回一行：
+
+- `ANGLE,CFG,PERIOD=...,KPQ8=...,KIQ8=...,KDQ8=...,DLIM=...,DGYRO=.../...,DFILT=.../...,ILIM=...,CLIM=...,DEAD=...`
+
+其中最常用的是：
+
+- `KPQ8` / `KIQ8` / `KDQ8`：当前 PID 参数
+- `CLIM`：角度环输出限幅
+- `DEAD`：误差死区
+
 ### 8.3 启动时串口会打印什么
 
 启动时你会看到几类重要信息：
@@ -439,8 +470,9 @@ mod_imu
 - `MOTOR,CHAIN=OK,...`
 - `MOTOR,PROFILE=...`
 - `MOTOR,TUNE,...`
+- `ANGLE,CFG,...`
 
-其中最后两条就是当前电机参数档案的自报家门。
+其中最后三条就是当前调车相关参数的自报家门。
 
 ### 8.4 VOFA 当前 6 通道是什么
 

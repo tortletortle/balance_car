@@ -2,6 +2,13 @@
 
 ## 2026-03-08
 
+### [调试] 补充角度环在线调参命令
+
+- 新增 `ANGLE` / `PID` 参数查看命令，串口可直接打印当前角度环配置
+- 新增 `ANGLE KP <q8>`、`ANGLE KI <q8>`、`ANGLE KD <q8>`、`ANGLE LIMIT <cmd>`、`ANGLE DEAD <ddeg>` 在线调参命令
+- 上电启动时增加 `ANGLE,CFG,...` 参数遥测，便于记录每轮调车时实际使用的内环参数
+- 串口帮助文本同步更新，避免现场调车时再去翻代码找命令
+
 ### [Docs] Add development manual
 
 - Add `docs/DEVELOPMENT_MANUAL.md` as a maintainer-facing handbook for reading, extending and debugging the current refactored project
@@ -76,6 +83,5 @@
 - 从旧工程代码而不是错误图片中提取接线关系，并形成 `docs/WIRING_FROM_CODE.md`
 - 冻结当前板级硬件事实，形成 `docs/HARDWARE_BASELINE.md`
 - 明确参考工程 `balance_v3` 只作为参考资产，不直接照搬实现
-
 
 

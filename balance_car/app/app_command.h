@@ -16,6 +16,7 @@ typedef struct
 {
     uint8_t help_requested;
     uint8_t status_requested;
+    uint8_t angle_config_requested;
     uint8_t clear_fault_requested;
     uint8_t arm_request_valid;
     uint8_t arm_request;
@@ -23,6 +24,16 @@ typedef struct
     int32_t target_pitch_mdeg;
     uint8_t vofa_enable_valid;
     uint8_t vofa_enable;
+    uint8_t angle_kp_valid;
+    int16_t angle_kp_q8;
+    uint8_t angle_ki_valid;
+    int16_t angle_ki_q8;
+    uint8_t angle_kd_valid;
+    int16_t angle_kd_q8;
+    uint8_t angle_cmd_limit_valid;
+    int16_t angle_cmd_limit;
+    uint8_t angle_deadband_valid;
+    int16_t angle_error_deadband_ddeg;
     uint8_t line_parsed;
     uint8_t line_valid;
 } app_command_result_t;

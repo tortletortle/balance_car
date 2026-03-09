@@ -200,7 +200,32 @@ void app_telemetry_send_heartbeat(app_telemetry_t *telemetry)
 
 void app_telemetry_send_help(app_telemetry_t *telemetry)
 {
-    app_telemetry_send_text(telemetry, "CMD,HELP=STATUS|ARM|DISARM|CLEAR|TARGET <mdeg>|VOFA ON|VOFA OFF\r\n");
+    app_telemetry_send_text(telemetry, "CMD,HELP1=STATUS|ARM|DISARM|CLEAR|TARGET <mdeg>|VOFA ON|VOFA OFF\r\n");
+    app_telemetry_send_text(telemetry, "CMD,HELP2=ANGLE|PID|ANGLE KP <q8>|ANGLE KI <q8>|ANGLE KD <q8>|ANGLE LIMIT <cmd>|ANGLE DEAD <ddeg>\r\n");
+}
+
+void app_telemetry_send_angle_config(app_telemetry_t *telemetry,
+                                     const ctrl_angle_loop_config_t *config)
+{
+    if ((telemetry == NULL) || (config == NULL))
+    {
+        return;
+    }
+
+    app_telemetry_send_format(telemetry,
+                              "ANGLE,CFG,PERIOD=%lu,KPQ8=%d,KIQ8=%d,KDQ8=%d,DLIM=%d,DGYRO=%u/%u,DFILT=%u/%u,ILIM=%ld,CLIM=%d,DEAD=%d\r\n",
+                              (unsigned long)config->loop_period_ms,
+                              config->kp_q8,
+                              config->ki_q8,
+                              config->kd_q8,
+                              config->d_input_limit_ddeg,
+                              (unsigned int)config->d_gyro_weight_num,
+                              (unsigned int)config->d_gyro_weight_den,
+                              (unsigned int)config->d_filter_alpha_num,
+                              (unsigned int)config->d_filter_alpha_den,
+                              (long)config->i_accum_limit,
+                              config->cmd_limit,
+                              config->error_deadband_ddeg);
 }
 
 void app_telemetry_send_state(app_telemetry_t *telemetry,
@@ -308,6 +333,46 @@ void app_telemetry_send_command_result(app_telemetry_t *telemetry,
         app_telemetry_send_format(telemetry,
                                   "CMD,VOFA=%u\r\n",
                                   (unsigned int)command_result->vofa_enable);
+    }
+
+    if (command_result->angle_config_requested != 0U)
+    {
+        app_telemetry_send_text(telemetry, "CMD,ANGLE=SHOW\r\n");
+    }
+
+    if (command_result->angle_kp_valid != 0U)
+    {
+        app_telemetry_send_format(telemetry,
+                                  "CMD,ANGLE,KP=%d\r\n",
+                                  (int)command_result->angle_kp_q8);
+    }
+
+    if (command_result->angle_ki_valid != 0U)
+    {
+        app_telemetry_send_format(telemetry,
+                                  "CMD,ANGLE,KI=%d\r\n",
+                                  (int)command_result->angle_ki_q8);
+    }
+
+    if (command_result->angle_kd_valid != 0U)
+    {
+        app_telemetry_send_format(telemetry,
+                                  "CMD,ANGLE,KD=%d\r\n",
+                                  (int)command_result->angle_kd_q8);
+    }
+
+    if (command_result->angle_cmd_limit_valid != 0U)
+    {
+        app_telemetry_send_format(telemetry,
+                                  "CMD,ANGLE,LIMIT=%d\r\n",
+                                  (int)command_result->angle_cmd_limit);
+    }
+
+    if (command_result->angle_deadband_valid != 0U)
+    {
+        app_telemetry_send_format(telemetry,
+                                  "CMD,ANGLE,DEAD=%d\r\n",
+                                  (int)command_result->angle_error_deadband_ddeg);
     }
 }
 

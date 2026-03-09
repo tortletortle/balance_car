@@ -28,6 +28,7 @@ static void app_command_clear_result(app_command_result_t *result)
 
     result->help_requested = 0U;
     result->status_requested = 0U;
+    result->angle_config_requested = 0U;
     result->clear_fault_requested = 0U;
     result->arm_request_valid = 0U;
     result->arm_request = 0U;
@@ -35,8 +36,38 @@ static void app_command_clear_result(app_command_result_t *result)
     result->target_pitch_mdeg = 0;
     result->vofa_enable_valid = 0U;
     result->vofa_enable = 0U;
+    result->angle_kp_valid = 0U;
+    result->angle_kp_q8 = 0;
+    result->angle_ki_valid = 0U;
+    result->angle_ki_q8 = 0;
+    result->angle_kd_valid = 0U;
+    result->angle_kd_q8 = 0;
+    result->angle_cmd_limit_valid = 0U;
+    result->angle_cmd_limit = 0;
+    result->angle_deadband_valid = 0U;
+    result->angle_error_deadband_ddeg = 0;
     result->line_parsed = 0U;
     result->line_valid = 0U;
+}
+
+static uint8_t app_command_parse_nonnegative_i16(const char *text, int16_t *value)
+{
+    char *end_ptr;
+    long parsed_value;
+
+    if ((text == NULL) || (value == NULL))
+    {
+        return 0U;
+    }
+
+    parsed_value = strtol(text, &end_ptr, 10);
+    if ((end_ptr == text) || (*end_ptr != '\0') || (parsed_value < 0L) || (parsed_value > 32767L))
+    {
+        return 0U;
+    }
+
+    *value = (int16_t)parsed_value;
+    return 1U;
 }
 
 static void app_command_trim(char *line)
@@ -157,6 +188,92 @@ static uint8_t app_command_parse_vofa(char *line, app_command_result_t *result)
     return 0U;
 }
 
+static uint8_t app_command_parse_angle(char *line, app_command_result_t *result)
+{
+    char *arg_text;
+    char *value_text;
+    int16_t value;
+
+    if (strncmp(line, "ANGLE", 5U) == 0)
+    {
+        arg_text = line + 5U;
+    }
+    else if (strncmp(line, "PID", 3U) == 0)
+    {
+        arg_text = line + 3U;
+    }
+    else
+    {
+        return 0U;
+    }
+
+    app_command_trim(arg_text);
+    if (arg_text[0] == '\0')
+    {
+        result->angle_config_requested = 1U;
+        return 1U;
+    }
+
+    value_text = arg_text;
+    while ((*value_text != '\0') && !isspace((unsigned char)*value_text))
+    {
+        value_text++;
+    }
+
+    if (*value_text == '\0')
+    {
+        result->line_valid = 0U;
+        return 0U;
+    }
+
+    *value_text = '\0';
+    value_text++;
+    app_command_trim(value_text);
+    if ((value_text[0] == '\0') || (app_command_parse_nonnegative_i16(value_text, &value) == 0U))
+    {
+        result->line_valid = 0U;
+        return 0U;
+    }
+
+    if (strcmp(arg_text, "KP") == 0)
+    {
+        result->angle_kp_valid = 1U;
+        result->angle_kp_q8 = value;
+        return 1U;
+    }
+
+    if (strcmp(arg_text, "KI") == 0)
+    {
+        result->angle_ki_valid = 1U;
+        result->angle_ki_q8 = value;
+        return 1U;
+    }
+
+    if (strcmp(arg_text, "KD") == 0)
+    {
+        result->angle_kd_valid = 1U;
+        result->angle_kd_q8 = value;
+        return 1U;
+    }
+
+    if (strcmp(arg_text, "LIMIT") == 0)
+    {
+        result->angle_cmd_limit_valid = 1U;
+        result->angle_cmd_limit = value;
+        return 1U;
+    }
+
+    if (strcmp(arg_text, "DEAD") == 0)
+    {
+        result->angle_deadband_valid = 1U;
+        result->angle_error_deadband_ddeg = value;
+        return 1U;
+    }
+
+    result->line_valid = 0U;
+    return 0U;
+}
+
 static uint8_t app_command_parse_line(char *line, app_command_result_t *result)
 {
     app_command_trim(line);
@@ -202,6 +319,11 @@ static uint8_t app_command_parse_line(char *line, app_command_result_t *result)
     }
 
     if (app_command_parse_vofa(line, result) != 0U)
+    {
+        return 1U;
+    }
+
+    if (app_command_parse_angle(line, result) != 0U)
     {
         return 1U;
     }

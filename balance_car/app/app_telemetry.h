@@ -26,6 +26,8 @@ void app_telemetry_send_boot(app_telemetry_t *telemetry);
 void app_telemetry_send_reset_flags(app_telemetry_t *telemetry);
 void app_telemetry_send_heartbeat(app_telemetry_t *telemetry);
 void app_telemetry_send_help(app_telemetry_t *telemetry);
+void app_telemetry_send_angle_config(app_telemetry_t *telemetry,
+                                     const ctrl_angle_loop_config_t *config);
 void app_telemetry_send_state(app_telemetry_t *telemetry,
                               app_state_machine_state_t state,
                               uint8_t arm_request,
