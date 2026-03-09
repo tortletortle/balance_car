@@ -202,6 +202,7 @@ void app_telemetry_send_help(app_telemetry_t *telemetry)
 {
     app_telemetry_send_text(telemetry, "CMD,HELP1=STATUS|ARM|DISARM|CLEAR|TARGET <mdeg>|VOFA ON|VOFA OFF\r\n");
     app_telemetry_send_text(telemetry, "CMD,HELP2=ANGLE|PID|ANGLE KP <q8>|ANGLE KI <q8>|ANGLE KD <q8>|ANGLE LIMIT <cmd>|ANGLE DEAD <ddeg>\r\n");
+    app_telemetry_send_text(telemetry, "CMD,HELP3=MOTOR <pwm>|MOTOR A <pwm>|MOTOR B <pwm>|MOTOR STOP\r\n");
 }
 
 void app_telemetry_send_angle_config(app_telemetry_t *telemetry,
@@ -226,6 +227,23 @@ void app_telemetry_send_angle_config(app_telemetry_t *telemetry,
                               (long)config->i_accum_limit,
                               config->cmd_limit,
                               config->error_deadband_ddeg);
+}
+
+void app_telemetry_send_motor_bench(app_telemetry_t *telemetry,
+                                    uint8_t active,
+                                    int16_t pwm_a,
+                                    int16_t pwm_b)
+{
+    if (telemetry == NULL)
+    {
+        return;
+    }
+
+    app_telemetry_send_format(telemetry,
+                              "MOTOR,BENCH,ACTIVE=%u,A=%d,B=%d\r\n",
+                              (unsigned int)active,
+                              (int)pwm_a,
+                              (int)pwm_b);
 }
 
 void app_telemetry_send_state(app_telemetry_t *telemetry,

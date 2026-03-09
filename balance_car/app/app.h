@@ -97,9 +97,12 @@ typedef struct
     uint8_t battery_ready;
     uint8_t encoders_ready;
     uint8_t arm_request;
+    uint8_t motor_bench_active;
     uint8_t vofa_enabled;
     uint8_t imu_ready_seen;
     uint8_t uart_rx_it_byte;
+    int16_t motor_bench_pwm_a;
+    int16_t motor_bench_pwm_b;
     int32_t target_pitch_mdeg;
     uint32_t last_attitude_update_ms;
     ctrl_attitude_estimator_output_t last_attitude_output;

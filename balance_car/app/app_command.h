@@ -17,6 +17,12 @@ typedef struct
     uint8_t help_requested;
     uint8_t status_requested;
     uint8_t angle_config_requested;
+    uint8_t motor_test_valid;
+    uint8_t motor_test_stop;
+    uint8_t motor_test_update_a;
+    uint8_t motor_test_update_b;
+    int16_t motor_test_pwm_a;
+    int16_t motor_test_pwm_b;
     uint8_t clear_fault_requested;
     uint8_t arm_request_valid;
     uint8_t arm_request;

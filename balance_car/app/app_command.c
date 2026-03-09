@@ -29,6 +29,12 @@ static void app_command_clear_result(app_command_result_t *result)
     result->help_requested = 0U;
     result->status_requested = 0U;
     result->angle_config_requested = 0U;
+    result->motor_test_valid = 0U;
+    result->motor_test_stop = 0U;
+    result->motor_test_update_a = 0U;
+    result->motor_test_update_b = 0U;
+    result->motor_test_pwm_a = 0;
+    result->motor_test_pwm_b = 0;
     result->clear_fault_requested = 0U;
     result->arm_request_valid = 0U;
     result->arm_request = 0U;
@@ -62,6 +68,26 @@ static uint8_t app_command_parse_nonnegative_i16(const char *text, int16_t *valu
 
     parsed_value = strtol(text, &end_ptr, 10);
     if ((end_ptr == text) || (*end_ptr != '\0') || (parsed_value < 0L) || (parsed_value > 32767L))
+    {
+        return 0U;
+    }
+
+    *value = (int16_t)parsed_value;
+    return 1U;
+}
+
+static uint8_t app_command_parse_i16(const char *text, int16_t *value)
+{
+    char *end_ptr;
+    long parsed_value;
+
+    if ((text == NULL) || (value == NULL))
+    {
+        return 0U;
+    }
+
+    parsed_value = strtol(text, &end_ptr, 10);
+    if ((end_ptr == text) || (*end_ptr != '\0') || (parsed_value < -32768L) || (parsed_value > 32767L))
     {
         return 0U;
     }
@@ -274,6 +300,102 @@ static uint8_t app_command_parse_angle(char *line, app_command_result_t *result)
     return 0U;
 }
 
+static uint8_t app_command_parse_motor(char *line, app_command_result_t *result)
+{
+    char *arg_text;
+    char *value_text;
+    int16_t value;
+
+    if (strncmp(line, "MOTOR", 5U) == 0)
+    {
+        arg_text = line + 5U;
+    }
+    else if (strncmp(line, "WHEEL", 5U) == 0)
+    {
+        arg_text = line + 5U;
+    }
+    else
+    {
+        return 0U;
+    }
+
+    app_command_trim(arg_text);
+    if (arg_text[0] == '\0')
+    {
+        result->line_valid = 0U;
+        return 0U;
+    }
+
+    if (strcmp(arg_text, "STOP") == 0)
+    {
+        result->motor_test_valid = 1U;
+        result->motor_test_stop = 1U;
+        result->motor_test_update_a = 1U;
+        result->motor_test_update_b = 1U;
+        result->motor_test_pwm_a = 0;
+        result->motor_test_pwm_b = 0;
+        return 1U;
+    }
+
+    if (app_command_parse_i16(arg_text, &value) != 0U)
+    {
+        result->motor_test_valid = 1U;
+        result->motor_test_update_a = 1U;
+        result->motor_test_update_b = 1U;
+        result->motor_test_pwm_a = value;
+        result->motor_test_pwm_b = value;
+        return 1U;
+    }
+
+    value_text = arg_text;
+    while ((*value_text != '\0') && !isspace((unsigned char)*value_text))
+    {
+        value_text++;
+    }
+
+    if (*value_text == '\0')
+    {
+        result->line_valid = 0U;
+        return 0U;
+    }
+
+    *value_text = '\0';
+    value_text++;
+    app_command_trim(value_text);
+    if ((value_text[0] == '\0') || (app_command_parse_i16(value_text, &value) == 0U))
+    {
+        result->line_valid = 0U;
+        return 0U;
+    }
+
+    result->motor_test_valid = 1U;
+    if ((strcmp(arg_text, "A") == 0) || (strcmp(arg_text, "LEFT") == 0))
+    {
+        result->motor_test_update_a = 1U;
+        result->motor_test_pwm_a = value;
+        return 1U;
+    }
+
+    if ((strcmp(arg_text, "B") == 0) || (strcmp(arg_text, "RIGHT") == 0))
+    {
+        result->motor_test_update_b = 1U;
+        result->motor_test_pwm_b = value;
+        return 1U;
+    }
+
+    if ((strcmp(arg_text, "BOTH") == 0) || (strcmp(arg_text, "ALL") == 0))
+    {
+        result->motor_test_update_a = 1U;
+        result->motor_test_update_b = 1U;
+        result->motor_test_pwm_a = value;
+        result->motor_test_pwm_b = value;
+        return 1U;
+    }
+
+    result->line_valid = 0U;
+    return 0U;
+}
+
 static uint8_t app_command_parse_line(char *line, app_command_result_t *result)
 {
     app_command_trim(line);
@@ -324,6 +446,11 @@ static uint8_t app_command_parse_line(char *line, app_command_result_t *result)
     }
 
     if (app_command_parse_angle(line, result) != 0U)
+    {
+        return 1U;
+    }
+
+    if (app_command_parse_motor(line, result) != 0U)
     {
         return 1U;
     }

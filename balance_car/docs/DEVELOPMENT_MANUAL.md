@@ -416,6 +416,10 @@ mod_imu
 - `ANGLE KD <q8>`
 - `ANGLE LIMIT <cmd>`
 - `ANGLE DEAD <ddeg>`
+- `MOTOR <pwm>`
+- `MOTOR A <pwm>`
+- `MOTOR B <pwm>`
+- `MOTOR STOP`
 
 其中：
 
@@ -425,8 +429,19 @@ mod_imu
 - `ANGLE KD <q8>`：修改角度环微分增益，单位是 `Q8`
 - `ANGLE LIMIT <cmd>`：修改角度环输出限幅
 - `ANGLE DEAD <ddeg>`：修改角度误差死区，单位是 `0.1°`
+- `MOTOR <pwm>`：同时给左右轮一个 bench PWM，用来测整体前后方向
+- `MOTOR A <pwm>`：只点动 A 轮
+- `MOTOR B <pwm>`：只点动 B 轮
+- `MOTOR STOP`：停止 bench 点动
 
 这里的 `Q8` 含义是：实际增益 = 串口写入值 / `256`。
+
+`MOTOR` bench 命令的使用前提是：
+
+- 车必须架空，不要直接放地上试
+- 先确认周围没有会卷入的线材和手指
+- 建议先从小 PWM 开始，例如 `120`、`150`、`200`
+- bench 命令只用于测方向，不用于正式直立控制
 
 ### 8.2 `STATUS` 行怎么看
 
@@ -459,6 +474,22 @@ mod_imu
 - `KPQ8` / `KIQ8` / `KDQ8`：当前 PID 参数
 - `CLIM`：角度环输出限幅
 - `DEAD`：误差死区
+
+如果你现在只是要测轮子方向，推荐顺序是：
+
+1. 架空车轮
+2. 串口发送 `MOTOR STOP`
+3. 串口发送 `MOTOR A 150`
+4. 观察 A 轮方向
+5. 串口发送 `MOTOR STOP`
+6. 串口发送 `MOTOR B 150`
+7. 观察 B 轮方向
+8. 串口发送 `MOTOR STOP`
+
+如果你想一起看两边同向输出，可以发：
+
+- `MOTOR 150`
+- `MOTOR -150`
 
 ### 8.3 启动时串口会打印什么
 

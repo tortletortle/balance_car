@@ -10,7 +10,7 @@
 #define BOARD_DELAY_US_USE_DWT        0U
 #define BOARD_DELAY_US_NOP_INNER_LOOP 6U
 #define BOARD_IMU_I2C_BIT_DELAY_US    20U
-#define BOARD_MOTOR_OUTPUT_ENABLE     0U
+#define BOARD_MOTOR_OUTPUT_ENABLE     1U
 
 static void board_delay_us_init(void)
 {

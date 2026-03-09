@@ -256,6 +256,47 @@ static void app_apply_angle_loop_tuning(app_t *app,
     }
 }
 
+static void app_apply_motor_bench_command(app_t *app,
+                                          const app_command_result_t *command_result,
+                                          uint8_t *force_status)
+{
+    if ((app == NULL) || (command_result == NULL) || (command_result->motor_test_valid == 0U))
+    {
+        return;
+    }
+
+    app->arm_request = 0U;
+    if (command_result->motor_test_stop != 0U)
+    {
+        app->motor_bench_active = 0U;
+        app->motor_bench_pwm_a = 0;
+        app->motor_bench_pwm_b = 0;
+    }
+    else
+    {
+        if (command_result->motor_test_update_a != 0U)
+        {
+            app->motor_bench_pwm_a = command_result->motor_test_pwm_a;
+        }
+
+        if (command_result->motor_test_update_b != 0U)
+        {
+            app->motor_bench_pwm_b = command_result->motor_test_pwm_b;
+        }
+
+        app->motor_bench_active = ((app->motor_bench_pwm_a != 0) || (app->motor_bench_pwm_b != 0)) ? 1U : 0U;
+    }
+
+    app_telemetry_send_motor_bench(&app->telemetry,
+                                   app->motor_bench_active,
+                                   app->motor_bench_pwm_a,
+                                   app->motor_bench_pwm_b);
+    if (force_status != NULL)
+    {
+        *force_status = 1U;
+    }
+}
+
 static HAL_StatusTypeDef app_init_drivers(app_t *app)
 {
     if ((app == NULL) || (app->config.hw.delay_us == NULL) ||
@@ -421,7 +462,10 @@ static HAL_StatusTypeDef app_init_modules(app_t *app)
     return HAL_OK;
 }
 
-static void app_apply_motor_output(app_t *app, int16_t pwm_cmd, uint8_t output_allowed)
+static void app_apply_motor_targets(app_t *app,
+                                    int16_t pwm_motor_a,
+                                    int16_t pwm_motor_b,
+                                    uint8_t output_allowed)
 {
     uint8_t enable_output;
 
@@ -430,10 +474,15 @@ static void app_apply_motor_output(app_t *app, int16_t pwm_cmd, uint8_t output_a
         return;
     }
 
-    mod_motor_set_common_target(&app->motor_module, pwm_cmd);
+    mod_motor_set_targets(&app->motor_module, pwm_motor_a, pwm_motor_b);
     enable_output = ((app->config.hw.motor_output_enable != 0U) && (output_allowed != 0U)) ? 1U : 0U;
     mod_motor_set_enable(&app->motor_module, enable_output);
     (void)mod_motor_update(&app->motor_module, NULL);
+}
+
+static void app_apply_motor_output(app_t *app, int16_t pwm_cmd, uint8_t output_allowed)
+{
+    app_apply_motor_targets(app, pwm_cmd, pwm_cmd, output_allowed);
 }
 
 static HAL_StatusTypeDef app_run_control_step(app_t *app, uint32_t now_ms)
@@ -519,6 +568,7 @@ static HAL_StatusTypeDef app_update_safety_and_state(app_t *app,
     app_state_machine_output_t state_output;
     uint8_t imu_running;
     uint8_t imu_fresh;
+    uint8_t bench_output_allowed;
 
     imu_running = mod_imu_is_running(&app->imu_module);
     imu_fresh = (imu_running != 0U) &&
@@ -553,9 +603,20 @@ static HAL_StatusTypeDef app_update_safety_and_state(app_t *app,
                                  safety_output.fault_latched_flags);
     }
 
+    bench_output_allowed = (safety_input.estop_active == 0U) &&
+                           ((app->battery_ready == 0U) || (safety_input.battery_undervoltage == 0U));
+
     if (state_output.current_state == APP_STATE_ARMED)
     {
+        app->motor_bench_active = 0U;
         app_apply_motor_output(app, app->last_speed_output.pwm_out, state_output.output_allowed);
+    }
+    else if (app->motor_bench_active != 0U)
+    {
+        app_apply_motor_targets(app,
+                                app->motor_bench_pwm_a,
+                                app->motor_bench_pwm_b,
+                                bench_output_allowed);
     }
     else
     {
@@ -591,6 +652,7 @@ static void app_handle_command_result(app_t *app,
     }
 
     app_apply_angle_loop_tuning(app, command_result, force_status);
+    app_apply_motor_bench_command(app, command_result, force_status);
 
     if ((clear_request != NULL) && (command_result->clear_fault_requested != 0U))
     {
@@ -668,7 +730,10 @@ void app_reset(app_t *app, uint32_t now_ms)
     }
 
     app->arm_request = 0U;
+    app->motor_bench_active = 0U;
     app->imu_ready_seen = 0U;
+    app->motor_bench_pwm_a = 0;
+    app->motor_bench_pwm_b = 0;
     if (app->battery_ready != 0U)
     {
         mod_battery_monitor_reset(&app->battery_module);
