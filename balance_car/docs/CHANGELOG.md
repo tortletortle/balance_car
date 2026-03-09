@@ -2,6 +2,12 @@
 
 ## 2026-03-08
 
+### [Docs] Add development manual
+
+- Add `docs/DEVELOPMENT_MANUAL.md` as a maintainer-facing handbook for reading, extending and debugging the current refactored project
+- Summarize layer boundaries, startup flow, runtime control path, command/telemetry path, parameter entry points and safe modification rules
+- Add the manual to `README.md` so it can be found quickly from the project root
+
 ### [Refactor] Motor profile parameterization
 
 - Add `app_motor_profile_t` to centralize motor-change-sensitive parameters: encoder direction, speed-loop signs, drive-chain signs, PWM limits, deadzone compensation, ramp and mechanical metadata.

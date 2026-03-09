@@ -36,6 +36,7 @@
 ## 关键文档
 
 - `docs/PROJECT_UNDERSTANDING.md`
+- `docs/DEVELOPMENT_MANUAL.md`
 - `docs/APP_INTEGRATION.md`
 - `docs/DECISIONS.md`
 - `docs/CHANGELOG.md`
