@@ -1,5 +1,13 @@
 ﻿# 变更记录
 
+## 2026-03-10
+
+### [Docs] Add external tuning reference summary
+
+- Add `docs/EXTERNAL_TUNING_REFERENCE.md` to summarize official references for PID tuning, IMU fusion, encoder/timer usage and TB6612 drive-chain behavior
+- Translate the source material into project-facing conclusions, focusing on current balance-car debugging rather than generic theory copying
+- Add the new note to `README.md` so it is easy to find during tuning and review
+
 ## 2026-03-08
 
 ### [调试] 下调低速区默认补偿参数
@@ -104,6 +112,10 @@
 - 从旧工程代码而不是错误图片中提取接线关系，并形成 `docs/WIRING_FROM_CODE.md`
 - 冻结当前板级硬件事实，形成 `docs/HARDWARE_BASELINE.md`
 - 明确参考工程 `balance_v3` 只作为参考资产，不直接照搬实现
+
+
+
+
 
 
 

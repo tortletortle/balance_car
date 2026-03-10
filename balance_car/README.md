@@ -40,4 +40,6 @@
 - `docs/APP_INTEGRATION.md`
 - `docs/DECISIONS.md`
 - `docs/CHANGELOG.md`
+- `docs/EXTERNAL_TUNING_REFERENCE.md`
 - `docs/WIRING_FROM_CODE.md`
+
