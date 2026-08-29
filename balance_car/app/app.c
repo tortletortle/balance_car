@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#define APP_TILT_CUTOFF_MDEG 15000
+
 const app_motor_profile_t g_app_default_motor_profile =
 {
     "CURRENT_BASE",
@@ -11,17 +13,21 @@ const app_motor_profile_t g_app_default_motor_profile =
     -1,
     -1,
     -1,
+    1000,
+    850,
+    1000,
+    1175,
     0U,
     100,
     2304,
     64,
     4000,
-    1780,
-    1780,
-    540,
-    540,
-    50,
-    200,
+    7000,
+    7000,
+    1200,
+    1200,
+    80,
+    1200,
     0U,
     0U,
     0U
@@ -49,6 +55,10 @@ static HAL_StatusTypeDef app_sync_motor_profile(app_logic_config_t *logic, board
         (app_is_valid_sign(profile->encoder_speed_sign_b) == 0U) ||
         (app_is_valid_sign(profile->motor_command_sign_a) == 0U) ||
         (app_is_valid_sign(profile->motor_command_sign_b) == 0U) ||
+        (profile->motor_scale_a_x1000 <= 0) ||
+        (profile->motor_scale_b_x1000 <= 0) ||
+        (profile->motor_dir_scale_fwd_x1000 <= 0) ||
+        (profile->motor_dir_scale_rev_x1000 <= 0) ||
         (profile->speed_cmd_to_delta_div <= 0) ||
         (profile->speed_i_accum_limit <= 0) ||
         (profile->speed_pwm_limit <= 0) ||
@@ -83,6 +93,8 @@ static HAL_StatusTypeDef app_sync_motor_profile(app_logic_config_t *logic, board
     logic->motor_config.ramp_step = profile->motor_ramp_step;
     logic->motor_config.command_sign_motor_a = profile->motor_command_sign_a;
     logic->motor_config.command_sign_motor_b = profile->motor_command_sign_b;
+    logic->motor_config.command_scale_a_x1000 = profile->motor_scale_a_x1000;
+    logic->motor_config.command_scale_b_x1000 = profile->motor_scale_b_x1000;
 
     return HAL_OK;
 }
@@ -112,19 +124,19 @@ HAL_StatusTypeDef app_logic_config_load_default(app_logic_config_t *config)
     };
     config->angle_loop_config = (ctrl_angle_loop_config_t){
         10U,
-        2816,
-        16,
-        256,
-        1U,
-        2U,
-        400,
+        13000,
+        0,
+        14080,
+        7U,
+        8U,
+        800,
         3U,
         4U,
         12000,
-        1500,
+        3200,
         0,
         0,
-        5
+        0
     };
     config->battery_config = (mod_battery_monitor_config_t){
         8U,
@@ -190,6 +202,8 @@ static void app_reset_control_chain(app_t *app, uint32_t now_ms)
     ctrl_speed_loop_reset(&app->speed_loop);
     mod_motor_reset(&app->motor_module);
     app->last_attitude_update_ms = now_ms;
+    app->last_encoder_delta_a = 0;
+    app->last_encoder_delta_b = 0;
     memset(&app->last_attitude_output, 0, sizeof(app->last_attitude_output));
     memset(&app->last_angle_output, 0, sizeof(app->last_angle_output));
     memset(&app->last_speed_output, 0, sizeof(app->last_speed_output));
@@ -265,7 +279,7 @@ static void app_apply_motor_bench_command(app_t *app,
         return;
     }
 
-    app->arm_request = 0U;
+    app->arm_request = 1U;
     if (command_result->motor_test_stop != 0U)
     {
         app->motor_bench_active = 0U;
@@ -474,6 +488,24 @@ static void app_apply_motor_targets(app_t *app,
         return;
     }
 
+    if (pwm_motor_a >= 0)
+    {
+        pwm_motor_a = (int16_t)(((int32_t)pwm_motor_a * app->config.logic.motor_profile.motor_dir_scale_fwd_x1000) / 1000);
+    }
+    else
+    {
+        pwm_motor_a = (int16_t)(((int32_t)pwm_motor_a * app->config.logic.motor_profile.motor_dir_scale_rev_x1000) / 1000);
+    }
+
+    if (pwm_motor_b >= 0)
+    {
+        pwm_motor_b = (int16_t)(((int32_t)pwm_motor_b * app->config.logic.motor_profile.motor_dir_scale_fwd_x1000) / 1000);
+    }
+    else
+    {
+        pwm_motor_b = (int16_t)(((int32_t)pwm_motor_b * app->config.logic.motor_profile.motor_dir_scale_rev_x1000) / 1000);
+    }
+
     mod_motor_set_targets(&app->motor_module, pwm_motor_a, pwm_motor_b);
     enable_output = ((app->config.hw.motor_output_enable != 0U) && (output_allowed != 0U)) ? 1U : 0U;
     mod_motor_set_enable(&app->motor_module, enable_output);
@@ -518,6 +550,15 @@ static HAL_StatusTypeDef app_run_control_step(app_t *app, uint32_t now_ms)
         return HAL_ERROR;
     }
 
+    if ((app->last_attitude_output.pitch_fused_mdeg >= APP_TILT_CUTOFF_MDEG) ||
+        (app->last_attitude_output.pitch_fused_mdeg <= -APP_TILT_CUTOFF_MDEG))
+    {
+        app->arm_request = 0U;
+        app->motor_bench_active = 0U;
+        app_reset_control_chain(app, now_ms);
+        return HAL_OK;
+    }
+
     angle_input.target_pitch_mdeg = app->target_pitch_mdeg;
     angle_input.pitch_mdeg = app->last_attitude_output.pitch_fused_mdeg;
     angle_input.pitch_rate_mdps = app->last_attitude_output.pitch_rate_mdps;
@@ -534,6 +575,9 @@ static HAL_StatusTypeDef app_run_control_step(app_t *app, uint32_t now_ms)
         encoder_delta_a = drv_encoder_get_delta(&app->encoder_a);
         encoder_delta_b = drv_encoder_get_delta(&app->encoder_b);
     }
+
+    app->last_encoder_delta_a = encoder_delta_a;
+    app->last_encoder_delta_b = encoder_delta_b;
 
     speed_input.encoder_delta_a = encoder_delta_a;
     speed_input.encoder_delta_b = encoder_delta_b;
@@ -698,7 +742,7 @@ HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_
                               (unsigned int)app->config.hw.motor_output_enable,
                               (unsigned int)app_is_estop_active(app));
     app_telemetry_send_format(&app->telemetry,
-                              "MOTOR,PROFILE=%s,HWDIR=%d,%d,ESIGN=%d,%d,MSIGN=%d,%d,PWM=%d,RAMP=%d\r\n",
+                              "MOTOR,PROFILE=%s,HWDIR=%d,%d,ESIGN=%d,%d,MSIGN=%d,%d,SCALE=%d,%d,DIR=%d,%d,PWM=%d,RAMP=%d\r\n",
                               app->config.logic.motor_profile.name,
                               app->config.logic.motor_profile.encoder_hw_direction_a,
                               app->config.logic.motor_profile.encoder_hw_direction_b,
@@ -706,6 +750,10 @@ HAL_StatusTypeDef app_init(app_t *app, const app_config_t *config, uint32_t now_
                               app->config.logic.motor_profile.encoder_speed_sign_b,
                               app->config.logic.motor_profile.motor_command_sign_a,
                               app->config.logic.motor_profile.motor_command_sign_b,
+                              app->config.logic.motor_profile.motor_scale_a_x1000,
+                              app->config.logic.motor_profile.motor_scale_b_x1000,
+                              app->config.logic.motor_profile.motor_dir_scale_fwd_x1000,
+                              app->config.logic.motor_profile.motor_dir_scale_rev_x1000,
                               app->config.logic.motor_profile.motor_pwm_limit,
                               app->config.logic.motor_profile.motor_ramp_step);
     app_telemetry_send_format(&app->telemetry,
@@ -822,7 +870,9 @@ HAL_StatusTypeDef app_task(app_t *app, uint32_t now_ms)
                                   app->target_pitch_mdeg,
                                   ctrl_attitude_estimator_get_last_output(&app->attitude_estimator),
                                   ctrl_angle_loop_get_last_output(&app->angle_loop),
-                                  ctrl_speed_loop_get_last_output(&app->speed_loop));
+                                  ctrl_speed_loop_get_last_output(&app->speed_loop),
+                                  app->last_encoder_delta_a,
+                                  app->last_encoder_delta_b);
     }
 
     return HAL_OK;
@@ -859,3 +909,5 @@ HAL_StatusTypeDef app_on_uart_error(app_t *app, UART_HandleTypeDef *huart)
     drv_uart_clear_overrun(&app->debug_uart);
     return app_uart_start_receive_it(app);
 }
+
+

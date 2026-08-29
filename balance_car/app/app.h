@@ -33,6 +33,10 @@ typedef struct
     int8_t encoder_speed_sign_b;
     int8_t motor_command_sign_a;
     int8_t motor_command_sign_b;
+    int16_t motor_scale_a_x1000;
+    int16_t motor_scale_b_x1000;
+    int16_t motor_dir_scale_fwd_x1000;
+    int16_t motor_dir_scale_rev_x1000;
     uint8_t speed_enable_closed_loop;
     int16_t speed_cmd_to_delta_div;
     int16_t speed_kp_q8;
@@ -105,6 +109,8 @@ typedef struct
     int16_t motor_bench_pwm_b;
     int32_t target_pitch_mdeg;
     uint32_t last_attitude_update_ms;
+    int16_t last_encoder_delta_a;
+    int16_t last_encoder_delta_b;
     ctrl_attitude_estimator_output_t last_attitude_output;
     ctrl_angle_loop_output_t last_angle_output;
     ctrl_speed_loop_output_t last_speed_output;

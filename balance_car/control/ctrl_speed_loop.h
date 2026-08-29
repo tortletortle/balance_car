@@ -43,6 +43,8 @@ typedef struct
 {
     ctrl_speed_loop_config_t config;
     uint8_t initialized;
+    uint8_t startup_stall_cycles;
+    int8_t startup_stall_direction;
     int32_t i_accum;
     ctrl_speed_loop_output_t last_output;
 } ctrl_speed_loop_t;

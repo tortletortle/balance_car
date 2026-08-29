@@ -9,10 +9,10 @@ const ctrl_speed_loop_config_t g_ctrl_speed_loop_default_config =
     2304,
     64,
     4000,
-    1780,
-    900,
-    980,
-    80
+    6500,
+    1600,
+    1600,
+    40
 };
 
 static int16_t ctrl_speed_loop_clamp_i16(int32_t value, int16_t limit)
@@ -45,31 +45,157 @@ static int32_t ctrl_speed_loop_clamp_i32(int32_t value, int32_t limit)
     return value;
 }
 
-static int16_t ctrl_speed_loop_apply_startup_assist(const ctrl_speed_loop_t *loop,
+static void ctrl_speed_loop_reset_startup_assist(ctrl_speed_loop_t *loop)
+{
+    if (loop == NULL)
+    {
+        return;
+    }
+
+    loop->startup_stall_cycles = 0U;
+    loop->startup_stall_direction = 0;
+}
+
+static int16_t ctrl_speed_loop_apply_startup_assist(ctrl_speed_loop_t *loop,
                                                     int16_t measured_delta,
                                                     int16_t base_cmd,
                                                     int16_t pwm_out)
 {
     int16_t abs_base_cmd;
+    int16_t assist_pwm;
+    const int16_t assist_full_cmd = 1200;
+    const int16_t assist_min_cmd_1 = 12;
+    const int16_t assist_min_cmd_2 = 200;
+    const int16_t assist_min_cmd_3 = 300;
+    const int16_t assist_min_pwm_1 = 900;
+    const int16_t assist_min_pwm_2 = 1200;
 
     abs_base_cmd = (base_cmd >= 0) ? base_cmd : (int16_t)(-base_cmd);
     if (abs_base_cmd < loop->config.startup_assist_min_cmd)
     {
+        ctrl_speed_loop_reset_startup_assist(loop);
         return pwm_out;
     }
 
-    if ((base_cmd > 0) && (measured_delta <= 0) && (pwm_out > 0) &&
-        (pwm_out < loop->config.startup_pwm_fwd))
+    if (base_cmd > 0)
     {
-        return loop->config.startup_pwm_fwd;
+        if (measured_delta > 0)
+        {
+            ctrl_speed_loop_reset_startup_assist(loop);
+            return pwm_out;
+        }
+
+        if (loop->startup_stall_direction == 1)
+        {
+            if (loop->startup_stall_cycles < 255U)
+            {
+                loop->startup_stall_cycles++;
+            }
+        }
+        else
+        {
+            loop->startup_stall_direction = 1;
+            loop->startup_stall_cycles = 1U;
+        }
+
+        if (abs_base_cmd < assist_min_cmd_1)
+        {
+            assist_pwm = abs_base_cmd;
+        }
+        else if (abs_base_cmd < assist_min_cmd_2)
+        {
+            assist_pwm = assist_min_pwm_1;
+        }
+        else if (abs_base_cmd < assist_min_cmd_3)
+        {
+            assist_pwm = assist_min_pwm_2;
+        }
+        else if (abs_base_cmd >= assist_full_cmd)
+        {
+            assist_pwm = loop->config.startup_pwm_fwd;
+        }
+        else
+        {
+            assist_pwm = (int16_t)(((int32_t)loop->config.startup_pwm_fwd * abs_base_cmd) / assist_full_cmd);
+            if (assist_pwm < abs_base_cmd)
+            {
+                assist_pwm = abs_base_cmd;
+            }
+        }
+        if ((loop->startup_stall_cycles >= 4U) && (abs_base_cmd >= assist_full_cmd))
+        {
+            assist_pwm = ctrl_speed_loop_clamp_i16((int32_t)loop->config.startup_pwm_fwd + 200,
+                                                   loop->config.pwm_limit);
+        }
+
+        if ((pwm_out > 0) && (pwm_out < assist_pwm))
+        {
+            return assist_pwm;
+        }
+
+        return pwm_out;
     }
 
-    if ((base_cmd < 0) && (measured_delta >= 0) && (pwm_out < 0) &&
-        (pwm_out > -loop->config.startup_pwm_rev))
+    if (base_cmd < 0)
     {
-        return (int16_t)(-loop->config.startup_pwm_rev);
+        if (measured_delta < 0)
+        {
+            ctrl_speed_loop_reset_startup_assist(loop);
+            return pwm_out;
+        }
+
+        if (loop->startup_stall_direction == -1)
+        {
+            if (loop->startup_stall_cycles < 255U)
+            {
+                loop->startup_stall_cycles++;
+            }
+        }
+        else
+        {
+            loop->startup_stall_direction = -1;
+            loop->startup_stall_cycles = 1U;
+        }
+
+        if (abs_base_cmd < assist_min_cmd_1)
+        {
+            assist_pwm = abs_base_cmd;
+        }
+        else if (abs_base_cmd < assist_min_cmd_2)
+        {
+            assist_pwm = assist_min_pwm_1;
+        }
+        else if (abs_base_cmd < assist_min_cmd_3)
+        {
+            assist_pwm = assist_min_pwm_2;
+        }
+        else if (abs_base_cmd >= assist_full_cmd)
+        {
+            assist_pwm = loop->config.startup_pwm_rev;
+        }
+        else
+        {
+            assist_pwm = (int16_t)(((int32_t)loop->config.startup_pwm_rev * abs_base_cmd) / assist_full_cmd);
+            if (assist_pwm < abs_base_cmd)
+            {
+                assist_pwm = abs_base_cmd;
+            }
+        }
+        if ((loop->startup_stall_cycles >= 4U) && (abs_base_cmd >= assist_full_cmd))
+        {
+            assist_pwm = ctrl_speed_loop_clamp_i16((int32_t)loop->config.startup_pwm_rev + 200,
+                                                   loop->config.pwm_limit);
+        }
+
+        if ((pwm_out < 0) && (pwm_out > -assist_pwm))
+        {
+            return (int16_t)(-assist_pwm);
+        }
+
+        return pwm_out;
     }
 
+    ctrl_speed_loop_reset_startup_assist(loop);
     return pwm_out;
 }
 
@@ -95,6 +221,7 @@ void ctrl_speed_loop_reset(ctrl_speed_loop_t *loop)
     }
 
     loop->i_accum = 0;
+    ctrl_speed_loop_reset_startup_assist(loop);
     loop->last_output.initialized = 0U;
     loop->last_output.target_delta = 0;
     loop->last_output.measured_delta = 0;
@@ -172,3 +299,5 @@ const ctrl_speed_loop_output_t *ctrl_speed_loop_get_last_output(const ctrl_speed
 
     return &loop->last_output;
 }
+
+

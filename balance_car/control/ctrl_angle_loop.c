@@ -179,8 +179,8 @@ HAL_StatusTypeDef ctrl_angle_loop_update(ctrl_angle_loop_t *loop,
     }
 
     pitch_error_mdeg = input->target_pitch_mdeg - input->pitch_mdeg;
-    pitch_error_ddeg = pitch_error_mdeg / 100;
-    pitch_actual_ddeg = input->pitch_mdeg / 100;
+    pitch_error_ddeg = ctrl_angle_loop_round_div_i64(pitch_error_mdeg, 50);
+    pitch_actual_ddeg = ctrl_angle_loop_round_div_i64(input->pitch_mdeg, 50);
     first_update = (loop->initialized == 0U) ? 1U : 0U;
 
     if (first_update != 0U)
@@ -195,7 +195,7 @@ HAL_StatusTypeDef ctrl_angle_loop_update(ctrl_angle_loop_t *loop,
         pitch_delta_ddeg = pitch_actual_ddeg - loop->prev_actual_ddeg;
         gyro_delta_ddeg = ctrl_angle_loop_round_div_i64(
             (int64_t)input->pitch_rate_mdps * (int64_t)loop->config.loop_period_ms,
-            100000);
+            50000);
     }
 
     if (ctrl_angle_loop_abs_i32(pitch_error_ddeg) <= loop->config.error_deadband_ddeg)

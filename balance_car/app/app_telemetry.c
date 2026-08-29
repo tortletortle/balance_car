@@ -269,7 +269,9 @@ void app_telemetry_send_status(app_telemetry_t *telemetry,
                                int32_t target_pitch_mdeg,
                                const ctrl_attitude_estimator_output_t *attitude,
                                const ctrl_angle_loop_output_t *angle,
-                               const ctrl_speed_loop_output_t *speed)
+                               const ctrl_speed_loop_output_t *speed,
+                               int16_t encoder_delta_a,
+                               int16_t encoder_delta_b)
 {
     uint32_t battery_mv;
     uint32_t battery_uv;
@@ -292,7 +294,7 @@ void app_telemetry_send_status(app_telemetry_t *telemetry,
     pwm_cmd = (speed != NULL) ? speed->pwm_out : 0;
 
     app_telemetry_send_format(telemetry,
-                              "STATUS,STATE=%s,ARM=%u,ESTOP=%u,BAT=%lu,UV=%lu,FAULT=0x%02lX,LATCH=0x%02lX,TGT=%ld,PITCH=%ld,RATE=%ld,ERR=%ld,ACMD=%d,PWM=%d\r\n",
+                              "STATUS,STATE=%s,ARM=%u,ESTOP=%u,BAT=%lu,UV=%lu,FAULT=0x%02lX,LATCH=0x%02lX,TGT=%ld,PITCH=%ld,RATE=%ld,ERR=%ld,ACMD=%d,PWM=%d,EDA=%d,EDB=%d\r\n",
                               app_state_machine_get_state_name(state),
                               arm_request,
                               estop_active,
@@ -305,7 +307,9 @@ void app_telemetry_send_status(app_telemetry_t *telemetry,
                               (long)pitch_rate_mdps,
                               (long)pitch_error_mdeg,
                               angle_cmd,
-                              pwm_cmd);
+                              pwm_cmd,
+                              (int)encoder_delta_a,
+                              (int)encoder_delta_b);
 }
 
 void app_telemetry_send_command_result(app_telemetry_t *telemetry,

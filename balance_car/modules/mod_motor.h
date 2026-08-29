@@ -12,6 +12,8 @@ typedef struct
     int16_t ramp_step;
     int8_t command_sign_motor_a;
     int8_t command_sign_motor_b;
+    int16_t command_scale_a_x1000;
+    int16_t command_scale_b_x1000;
 } mod_motor_config_t;
 
 typedef struct

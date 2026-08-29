@@ -46,7 +46,9 @@ void app_telemetry_send_status(app_telemetry_t *telemetry,
                                int32_t target_pitch_mdeg,
                                const ctrl_attitude_estimator_output_t *attitude,
                                const ctrl_angle_loop_output_t *angle,
-                               const ctrl_speed_loop_output_t *speed);
+                               const ctrl_speed_loop_output_t *speed,
+                               int16_t encoder_delta_a,
+                               int16_t encoder_delta_b);
 void app_telemetry_send_command_result(app_telemetry_t *telemetry,
                                        const app_command_result_t *command_result);
 void app_telemetry_send_imu_event(app_telemetry_t *telemetry,
